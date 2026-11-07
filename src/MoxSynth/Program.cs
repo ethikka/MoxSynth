@@ -18,6 +18,7 @@ var paths = DatabasePaths.Resolve(dbOptions, builder.Environment.ContentRootPath
 
 builder.Services.AddSingleton(paths);
 builder.Services.AddSingleton<CardRepository>();
+builder.Services.AddSingleton<CardRecognizer>();
 builder.Services.AddSingleton<CollectionRepository>();
 
 var app = builder.Build();

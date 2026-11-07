@@ -1,0 +1,156 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject CardRecognizer Recognizer
+
+@if (_open)
+{
+    <div class="scanner-backdrop" @onclick="CloseAsync">
+        <div class="card scanner-dialog" @onclick:stopPropagation="true">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Scan a card</strong>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseAsync"></button>
+            </div>
+            <div class="card-body">
+                @if (_cameraAvailable)
+                {
+                    <div class="scanner-video-wrap">
+                        <video @ref="_video" class="scanner-video" playsinline muted autoplay></video>
+                        <div @ref="_guide" class="scanner-guide">
+                            <div class="scanner-region scanner-region-title"></div>
+                            <div class="scanner-region scanner-region-bottom"></div>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-secondary small mb-2">
+                        Live camera needs a secure connection (https or localhost). You can still take or choose a photo.
+                    </div>
+                }
+
+                <p class="small mb-1 mt-2">
+                    @if (_error is not null)
+                    {
+                        <span class="text-danger">@_error</span>
+                    }
+                    else
+                    {
+                        <span class="text-body-secondary">@_status</span>
+                    }
+                </p>
+                @if (!string.IsNullOrWhiteSpace(_lastTitle) || !string.IsNullOrWhiteSpace(_lastBottom))
+                {
+                    <p class="small text-body-secondary font-monospace mb-0">
+                        read: “@_lastTitle” · “@_lastBottom”
+                    </p>
+                }
+            </div>
+            <div class="card-footer d-flex flex-wrap gap-2 justify-content-end">
+                <label class="btn btn-outline-secondary btn-sm mb-0">
+                    Take / choose photo
+                    <input @ref="_file" type="file" accept="image/*" capture="environment" hidden @onchange="ScanFileAsync" />
+                </label>
+                @if (_cameraAvailable)
+                {
+                    <button type="button" class="btn btn-primary btn-sm" @onclick="ScanNowAsync">Scan now</button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Raised once a card has been recognised; the dialog closes itself.</summary>
+    [Parameter] public EventCallback<CardRecognition> OnRecognized { get; set; }
+
+    private bool _open;
+    private bool _startPending;
+    private bool _cameraAvailable = true;
+    private string _status = "";
+    private string? _error;
+    private string? _lastTitle;
+    private string? _lastBottom;
+    private CardRecognition? _previous; // live scanning: require the same result twice unless very confident
+
+    private ElementReference _video;
+    private ElementReference _guide;
+    private ElementReference _file;
+    private DotNetObjectReference<CardScanner>? _self;
+
+    public async Task ShowAsync()
+    {
+        _self ??= DotNetObjectReference.Create(this);
+        _cameraAvailable = await JS.InvokeAsync<bool>("moxScanner.isCameraAvailable");
+        _open = true;
+        _error = null;
+        _previous = null;
+        _lastTitle = _lastBottom = null;
+        _status = _cameraAvailable
+            ? "Hold the card inside the frame, title at the top. Scanning automatically…"
+            : "Take a photo where the card fills the picture.";
+        _startPending = _cameraAvailable;
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_startPending || !_open) return;
+        _startPending = false;
+        _error = await JS.InvokeAsync<string?>("moxScanner.start", _video, _guide, _self);
+        if (_error is not null) StateHasChanged();
+    }
+
+    private async Task ScanNowAsync() => await JS.InvokeVoidAsync("moxScanner.scanNow", _video, _self);
+
+    private async Task ScanFileAsync()
+    {
+        _status = "Reading photo…";
+        _error = null;
+        await JS.InvokeVoidAsync("moxScanner.scanFile", _file, _self);
+    }
+
+    /// <summary>Called from scanner.js with the OCR text of the title line and the bottom-left info line.</summary>
+    [JSInvokable]
+    public async Task<bool> OnOcrText(string title, string bottom, bool fromPhoto)
+    {
+        _lastTitle = title;
+        _lastBottom = bottom;
+        var result = Recognizer.Recognize(title, bottom);
+
+        var accept = result is not null && (fromPhoto || result.Confidence >= 0.9 || result == _previous);
+        if (!accept)
+        {
+            _previous = result;
+            _status = fromPhoto
+                ? "Couldn't recognise the card – try a sharper photo with the card filling the picture."
+                : result is null ? "Looking for a card…" : $"Is it {result.Name}? Hold still…";
+            await InvokeAsync(StateHasChanged);
+            return false;
+        }
+
+        await CloseAsync();
+        await OnRecognized.InvokeAsync(result!);
+        return true;
+    }
+
+    private async Task CloseAsync()
+    {
+        _open = false;
+        await JS.InvokeVoidAsync("moxScanner.stop");
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_self is null) return; // never opened (e.g. prerendering): nothing to stop
+        try
+        {
+            await JS.InvokeVoidAsync("moxScanner.stop");
+        }
+        catch (JSDisconnectedException)
+        {
+            // circuit already gone
+        }
+        _self.Dispose();
+    }
+}

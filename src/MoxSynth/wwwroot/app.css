@@ -314,3 +314,75 @@ h1:focus {
     color: var(--neon-cyan);
     text-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), .8), 0 0 22px rgba(var(--neon-cyan-rgb), .4);
 }
+
+/* =========================================================================
+   Card scanner
+   ========================================================================= */
+
+.scanner-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1060;
+    background: rgba(0, 0, 0, .65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.scanner-dialog {
+    width: min(720px, 100%);
+    max-height: 100%;
+    overflow: auto;
+}
+
+.scanner-video-wrap {
+    position: relative;
+    background: #000;
+    border-radius: .375rem;
+    overflow: hidden;
+}
+
+.scanner-video {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Card outline; regions mirror TITLE / BOTTOM in scanner.js. */
+.scanner-guide {
+    position: absolute;
+    border: 2px solid rgba(255, 255, 255, .9);
+    border-radius: 4.75% / 3.5%;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45);
+    pointer-events: none;
+}
+
+.scanner-region {
+    position: absolute;
+    border: 2px dashed #ffd43b;
+    border-radius: 3px;
+}
+
+.scanner-region-title {
+    left: 4%;
+    top: 2%;
+    width: 74%;
+    height: 10%;
+}
+
+.scanner-region-bottom {
+    left: 2%;
+    top: 86%;
+    width: 56%;
+    height: 13%;
+}
+
+.theme-neon .scanner-guide {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 0 9999px rgba(11, 7, 22, .55), 0 0 18px rgba(var(--neon-cyan-rgb), .8);
+}
+
+.theme-neon .scanner-region {
+    border-color: var(--neon-pink);
+}
