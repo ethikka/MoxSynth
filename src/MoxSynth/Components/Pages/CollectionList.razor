@@ -1,0 +1,224 @@
+@page "/collection"
+@inject CollectionRepository Collection
+@inject CardRepository Cards
+@implements IDisposable
+
+<PageTitle>Collection · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Collection</h1>
+
+<form class="card card-body mb-3" @onsubmit="SearchAsync">
+    <div class="row g-2 align-items-end">
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label small mb-0">Name</label>
+            <input class="form-control" placeholder="Filter by name" autocomplete="off"
+                   @bind="_query.Name" @bind:event="oninput" @bind:after="ScheduleSearchAsync" />
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label small mb-0">Set</label>
+            <select class="form-select" @bind="_query.SetCode" @bind:after="SearchAsync">
+                <option value="">All sets</option>
+                @foreach (var setCode in _setCodes)
+                {
+                    <option value="@setCode">@SetLabel(setCode)</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label small mb-0">Finish</label>
+            <select class="form-select" @bind="_query.Finish" @bind:after="SearchAsync">
+                <option value="">Any finish</option>
+                <option value="nonfoil">Non-foil</option>
+                <option value="foil">Foil</option>
+                <option value="etched">Etched</option>
+                <option value="signed">Signed</option>
+            </select>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label small mb-0">Show collection as of (optional)</label>
+            <input type="datetime-local" class="form-control" @bind="_asOfLocal" @bind:after="SearchAsync" />
+        </div>
+        <div class="col-lg-2 col-md-12 text-end">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Clear</button>
+        </div>
+    </div>
+</form>
+
+@if (_page is null)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <p class="text-muted small">
+        @_page.TotalCopies.ToString("N0") cards in @_page.Groups.TotalCount.ToString("N0") groups
+        @if (_query.AsOf is not null)
+        {
+            <span class="badge text-bg-info gap-start-2">Historic view: @SqliteTime.Display(_query.AsOf) (read-only)</span>
+        }
+    </p>
+
+    @if (_page.Groups.Items.Count == 0)
+    {
+        <div class="alert alert-light">Nothing here yet. <a href="search">Search for cards</a> to start your collection.</div>
+    }
+    else
+    {
+        <table class="table table-sm table-hover">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Name</th>
+                    <th>Set</th>
+                    <th>#</th>
+                    <th>Finish</th>
+                    <th>Cond.</th>
+                    <th>Lang</th>
+                    <th class="text-center">Qty</th>
+                    <th>Last added</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var g in _page.Groups.Items)
+                {
+                    var info = _cardInfo.GetValueOrDefault(g.CardUuid);
+                    <tr>
+                        <td>
+                            @if (ScryfallImages.Url(info?.ScryfallId, "small") is { } img)
+                            {
+                                <img class="card-thumb" src="@img" loading="lazy" alt="" />
+                            }
+                        </td>
+                        <td>
+                            <a href="card/@g.CardUuid">@g.Name</a>
+                            <ManaText Text="@(info?.ManaCost)" Class="gap-start-1" />
+                        </td>
+                        <td class="small">
+                            <SetSymbol KeyruneCode="@(info?.KeyruneCode)" Rarity="@(info?.Rarity)" />
+                            @(info?.SetName ?? g.SetCode) <span class="text-muted">(@g.SetCode)</span>
+                        </td>
+                        <td class="small">@g.Number</td>
+                        <td class="small">@CardFinishes.Label(g.Finish)</td>
+                        <td class="small">@g.Condition.Short()</td>
+                        <td class="small">@g.Language</td>
+                        <td class="text-center fw-semibold">@g.Quantity</td>
+                        <td class="small text-muted">@SqliteTime.Display(g.LastAddedAt)</td>
+                        <td class="text-end text-nowrap">
+                            @if (_query.AsOf is null)
+                            {
+                                <button class="btn btn-outline-secondary btn-sm py-0" title="Remove one copy (oldest first)"
+                                        @onclick="() => RemoveOneAsync(g)">−1</button>
+                                <button class="btn btn-outline-primary btn-sm py-0 gap-start-1" title="Add one more copy"
+                                        @onclick="() => AddOneAsync(g)">+1</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <Pager Page="_page.Groups.Page" TotalPages="_page.Groups.TotalPages" PageChanged="GoToPageAsync" />
+    }
+}
+
+<Toast @ref="_toast" />
+
+@code {
+    private readonly CollectionQuery _query = new();
+    private DateTime? _asOfLocal;
+    private CollectionPage? _page;
+    private IReadOnlyList<string> _setCodes = [];
+    private Dictionary<string, SetInfo> _sets = new();
+    private Dictionary<string, CardSummary> _cardInfo = new();
+    private Toast? _toast;
+    private CancellationTokenSource? _debounce;
+    private int _loadVersion;   // drops results of loads that were overtaken by newer ones
+
+    protected override async Task OnInitializedAsync()
+    {
+        _sets = (await Cards.GetSetsAsync()).ToDictionary(s => s.Code, StringComparer.OrdinalIgnoreCase);
+        _setCodes = await Collection.GetSetCodesAsync();
+        await LoadAsync();
+    }
+
+    private string SetLabel(string code) => _sets.TryGetValue(code, out var s) ? s.Label : code;
+
+    private async Task LoadAsync()
+    {
+        var version = ++_loadVersion;
+        var page = await Collection.GetGroupsAsync(_query);
+        var cardInfo = await Cards.GetSummariesAsync(page.Groups.Items.Select(g => g.CardUuid));
+        if (version != _loadVersion) return;
+        _page = page;
+        _cardInfo = cardInfo;
+    }
+
+    /// <summary>Name box: filter as you type, 300 ms after the last keystroke.</summary>
+    private async Task ScheduleSearchAsync()
+    {
+        _debounce?.Cancel();
+        var cts = _debounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        await SearchAsync();
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+
+    /// <summary>Dropdowns, date and Enter: apply immediately.</summary>
+    private async Task SearchAsync()
+    {
+        _debounce?.Cancel();
+        _query.Page = 1;
+        _query.AsOf = _asOfLocal is { } local ? DateTime.SpecifyKind(local, DateTimeKind.Local).ToUniversalTime() : null;
+        await LoadAsync();
+    }
+
+    private async Task ClearAsync()
+    {
+        _debounce?.Cancel();
+        _query.Name = null;
+        _query.SetCode = null;
+        _query.Finish = null;
+        _query.AsOf = null;
+        _asOfLocal = null;
+        _query.Page = 1;
+        await LoadAsync();
+    }
+
+    private async Task GoToPageAsync(int page)
+    {
+        _query.Page = page;
+        await LoadAsync();
+    }
+
+    private async Task RemoveOneAsync(CollectionGroup g)
+    {
+        if (await Collection.RemoveOneAsync(g.CardUuid, g.Finish, g.Condition, g.Language, reason: "Other"))
+            _toast?.Show($"Removed 1× {g.Name}. Undo from the card page if needed.", "secondary");
+        await LoadAsync();
+    }
+
+    private async Task AddOneAsync(CollectionGroup g)
+    {
+        await Collection.AddAsync(new AddCardsRequest
+        {
+            CardUuid = g.CardUuid,
+            Name = g.Name,
+            SetCode = g.SetCode,
+            Number = g.Number,
+            Finish = g.Finish,
+            Condition = g.Condition,
+            Language = g.Language,
+        });
+        _toast?.Show($"Added 1× {g.Name}");
+        await LoadAsync();
+    }
+}

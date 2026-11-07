@@ -1,0 +1,20 @@
+@if (!string.IsNullOrEmpty(KeyruneCode))
+{
+    <i class="ss ss-@KeyruneCode.ToLowerInvariant() @RarityClass ss-grad ss-fw" title="@Title"></i>
+}
+
+@code {
+    [Parameter] public string? KeyruneCode { get; set; }
+    [Parameter] public string? Rarity { get; set; }
+    [Parameter] public string? Title { get; set; }
+
+    private string RarityClass => Rarity switch
+    {
+        "common" => "ss-common",
+        "uncommon" => "ss-uncommon",
+        "rare" => "ss-rare",
+        "mythic" => "ss-mythic",
+        null or "" => "",
+        _ => "ss-timeshifted",
+    };
+}

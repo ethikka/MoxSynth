@@ -1,0 +1,34 @@
+@inject IJSRuntime JS
+
+<select class="form-select form-select-sm theme-select" aria-label="Colour scheme" title="Colour scheme"
+        value="@_theme" @onchange="OnChangeAsync">
+    @foreach (var (value, label) in Themes)
+    {
+        <option value="@value">@label</option>
+    }
+</select>
+
+@code {
+    private static readonly (string Value, string Label)[] Themes =
+    [
+        ("system", "◐ System"),
+        ("light", "☀ Light"),
+        ("dark", "☾ Dark"),
+        ("neon", "⚡ Neon"),
+    ];
+
+    private string _theme = "system";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _theme = await JS.InvokeAsync<string>("moxTheme.get");
+        StateHasChanged();
+    }
+
+    private async Task OnChangeAsync(ChangeEventArgs e)
+    {
+        _theme = e.Value?.ToString() ?? "system";
+        await JS.InvokeVoidAsync("moxTheme.set", _theme);
+    }
+}

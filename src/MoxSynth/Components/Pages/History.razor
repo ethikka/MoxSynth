@@ -1,0 +1,56 @@
+@page "/history"
+@inject CollectionRepository Collection
+
+<PageTitle>History · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">History</h1>
+
+@if (_result is null)
+{
+    <p class="text-muted">Loading…</p>
+}
+else if (_result.Items.Count == 0)
+{
+    <div class="alert alert-light">No activity yet.</div>
+}
+else
+{
+    <table class="table table-sm">
+        <thead>
+            <tr><th>When</th><th>Event</th><th>Card</th><th>Set</th><th>Finish</th><th>Cond.</th><th>Reason</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var e in _result.Items)
+            {
+                <tr>
+                    <td class="small text-nowrap">@SqliteTime.Display(e.At)</td>
+                    <td>
+                        @if (e.Kind == "Added")
+                        {
+                            <span class="badge text-bg-success">Added</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">Removed</span>
+                        }
+                    </td>
+                    <td><a href="card/@e.CardUuid">@e.Name</a></td>
+                    <td class="small">@e.SetCode #@e.Number</td>
+                    <td class="small">@CardFinishes.Label(e.Finish)</td>
+                    <td class="small">@e.Condition.Short()</td>
+                    <td class="small text-muted">@e.RemovalReason</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <Pager Page="_result.Page" TotalPages="_result.TotalPages" PageChanged="LoadAsync" />
+}
+
+@code {
+    private PagedResult<HistoryEvent>? _result;
+
+    protected override Task OnInitializedAsync() => LoadAsync(1);
+
+    private async Task LoadAsync(int page) => _result = await Collection.GetHistoryAsync(page);
+}

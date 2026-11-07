@@ -1,0 +1,35 @@
+@implements IDisposable
+
+@if (_message is not null)
+{
+    <div class="toast-msg alert alert-@_kind shadow-sm py-2 px-3 mb-0">@_message</div>
+}
+
+@code {
+    private string? _message;
+    private string _kind = "success";
+    private CancellationTokenSource? _cts;
+
+    public void Show(string message, string kind = "success")
+    {
+        _cts?.Cancel();
+        _cts = new CancellationTokenSource();
+        var token = _cts.Token;
+
+        _message = message;
+        _kind = kind;
+        StateHasChanged();
+
+        _ = Task.Delay(TimeSpan.FromSeconds(3), token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return Task.CompletedTask;
+            return InvokeAsync(() =>
+            {
+                _message = null;
+                StateHasChanged();
+            });
+        }, TaskScheduler.Default);
+    }
+
+    public void Dispose() => _cts?.Cancel();
+}

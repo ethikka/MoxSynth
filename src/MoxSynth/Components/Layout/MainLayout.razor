@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+@inject CardRepository Cards
+
+<nav class="navbar navbar-expand navbar-dark bg-dark mb-3">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">MoxSynth</a>
+        <ul class="navbar-nav me-auto">
+            <li class="nav-item"><NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink></li>
+            <li class="nav-item"><NavLink class="nav-link" href="search">Search cards</NavLink></li>
+            <li class="nav-item"><NavLink class="nav-link" href="collection">Collection</NavLink></li>
+            <li class="nav-item"><NavLink class="nav-link" href="history">History</NavLink></li>
+        </ul>
+        <ThemeSelector />
+    </div>
+</nav>
+
+<main class="container-fluid pb-5">
+    @if (!Cards.IsAvailable)
+    {
+        <div class="alert alert-warning">
+            Card database not found at <code>@Cards.DatabasePath</code>.
+            Download <strong>AllPrintings.sqlite.zip</strong> from mtgjson.com, put it in that folder and restart the app.
+        </div>
+    }
+    @Body
+</main>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>

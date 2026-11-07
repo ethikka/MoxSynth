@@ -1,0 +1,349 @@
+@page "/search"
+@inject CardRepository Cards
+@inject CollectionRepository Collection
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Search cards · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Search cards</h1>
+
+<form class="card card-body mb-3" @onsubmit="SearchNow">
+    <div class="row g-2">
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label small mb-0">Name and/or collector #</label>
+            <input class="form-control" placeholder="e.g. bolt light, 123 or bolt 12" autocomplete="off"
+                   @bind="_form.Name" @bind:event="oninput" @bind:after="ScheduleSearchAsync" />
+            @{ var nameSearch = _form.NameSearch; }
+            @if (!nameSearch.IsEmpty)
+            {
+                <div class="form-text">
+                    @if (nameSearch.NameParts.Count > 0)
+                    {
+                        <span>Name contains</span>
+                        @foreach (var part in nameSearch.NameParts)
+                        {
+                            <span class="badge text-bg-secondary gap-start-1">@part</span>
+                        }
+                    }
+                    @if (nameSearch.CollectorNumber is { } number)
+                    {
+                        <span class="@(nameSearch.NameParts.Count > 0 ? "gap-start-2" : "")">Collector #</span>
+                        <span class="badge text-bg-info gap-start-1">@number…</span>
+                    }
+                </div>
+            }
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label small mb-0">Type line</label>
+            <input class="form-control" placeholder="e.g. Goblin" autocomplete="off"
+                   @bind="_form.Type" @bind:event="oninput" @bind:after="ScheduleSearchAsync" />
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label small mb-0">Rules text</label>
+            <input class="form-control" placeholder="e.g. draw a card" autocomplete="off"
+                   @bind="_form.Text" @bind:event="oninput" @bind:after="ScheduleSearchAsync" />
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <label class="form-label small mb-0">Set</label>
+            <select class="form-select" @bind="_form.SetCode" @bind:after="SearchNow">
+                <option value="">Any set</option>
+                @foreach (var s in _sets)
+                {
+                    <option value="@s.Code">@s.Label</option>
+                }
+            </select>
+        </div>
+        <div class="col-lg-2 col-md-6">
+            <label class="form-label small mb-0">Rarity</label>
+            <select class="form-select" @bind="_form.Rarity" @bind:after="SearchNow">
+                <option value="">Any rarity</option>
+                <option value="common">Common</option>
+                <option value="uncommon">Uncommon</option>
+                <option value="rare">Rare</option>
+                <option value="mythic">Mythic</option>
+                <option value="special">Special</option>
+                <option value="bonus">Bonus</option>
+            </select>
+        </div>
+    </div>
+    <div class="row g-2 mt-1">
+        <div class="col-12">
+            <label class="form-label small mb-0">
+                Scryfall syntax
+                <a class="gap-start-1" href="https://scryfall.com/docs/syntax" target="_blank" rel="noopener">reference</a>
+            </label>
+            <input class="form-control font-monospace" autocomplete="off" spellcheck="false"
+                   placeholder="e.g. t:creature c:rg mv<=3 -is:reprint   or   (o:draw OR o:scry) f:modern order:mv"
+                   @bind="_form.Scryfall" @bind:event="oninput" @bind:after="ScheduleSearchAsync" />
+            @if (!string.IsNullOrWhiteSpace(_form.Scryfall))
+            {
+                var parsed = Cards.ParseScryfall(_form.Scryfall);
+                @if (parsed.Description is not null)
+                {
+                    <div class="form-text">Cards where @parsed.Description</div>
+                }
+                @foreach (var warning in parsed.Warnings)
+                {
+                    <div class="form-text text-warning-emphasis">⚠ @warning</div>
+                }
+            }
+        </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-3 mt-3">
+        <div class="btn-group" role="group" aria-label="Colours">
+            @foreach (var color in "WUBRGC")
+            {
+                var c = color;
+                <input type="checkbox" class="btn-check" id="color-@c" autocomplete="off"
+                       checked="@_colors.Contains(c)" @onchange="() => ToggleColor(c)" />
+                <label class="btn btn-outline-secondary btn-sm" for="color-@c" title="@c">
+                    <i class="ms ms-@(char.ToLowerInvariant(c)) ms-cost"></i>
+                </label>
+            }
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="nonpaper" @bind="_form.IncludeNonPaper" @bind:after="SearchNow" />
+            <label class="form-check-label small" for="nonpaper">Include online-only (MTGO/Arena)</label>
+        </div>
+        <div class="ms-auto">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Clear">Clear</button>
+        </div>
+    </div>
+</form>
+
+@if (_loading && _result is null)
+{
+    <p class="text-muted">Searching…</p>
+}
+else if (_result is not null)
+{
+    <p class="text-muted small">
+        @_result.TotalCount.ToString("N0") printings found
+        @if (_loading)
+        {
+            <span class="spinner-border spinner-border-sm gap-start-1" role="status" aria-label="Searching"></span>
+        }
+    </p>
+
+    <table class="table table-sm table-hover">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Set</th>
+                <th>#</th>
+                <th class="text-center">Owned</th>
+                <th class="text-end">Quick add (NM)</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var card in _result.Items)
+            {
+                var owned = _owned.GetValueOrDefault(card.Uuid);
+                <tr>
+                    <td>
+                        @if (ScryfallImages.Url(card.ScryfallId, "small") is { } img)
+                        {
+                            <img class="card-thumb" src="@img" loading="lazy" alt="" />
+                        }
+                    </td>
+                    <td>
+                        <a href="card/@card.Uuid">@card.Name</a>
+                        <ManaText Text="@card.ManaCost" Class="gap-start-1" />
+                    </td>
+                    <td class="small">@card.Type</td>
+                    <td class="small">
+                        <SetSymbol KeyruneCode="@card.KeyruneCode" Rarity="@card.Rarity" Title="@card.Rarity" />
+                        @card.SetName <span class="text-muted">(@card.SetCode)</span>
+                    </td>
+                    <td class="small @(_numberMode ? "fw-bold" : "")">@card.Number</td>
+                    <td class="text-center">
+                        @if (owned > 0)
+                        {
+                            <span class="badge text-bg-success">@owned</span>
+                        }
+                    </td>
+                    <td class="text-end text-nowrap">
+                        @foreach (var finish in card.FinishList)
+                        {
+                            var f = finish;
+                            <button class="btn btn-outline-primary btn-sm gap-start-1" title="Add 1 @CardFinishes.Label(f)"
+                                    @onclick="() => QuickAdd(card, f)">
+                                + @CardFinishes.Short(f)
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <Pager Page="_result.Page" TotalPages="_result.TotalPages" PageChanged="GoToPage" />
+}
+
+<Toast @ref="_toast" />
+
+@code {
+    [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
+    [SupplyParameterFromQuery(Name = "type")] public string? TypeFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "text")] public string? TextFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "set")] public string? SetFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "rarity")] public string? RarityFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "colors")] public string? ColorsFilter { get; set; }
+    [SupplyParameterFromQuery(Name = "all")] public bool? All { get; set; }
+    [SupplyParameterFromQuery(Name = "page")] public int? PageNumber { get; set; }
+    [SupplyParameterFromQuery(Name = "sf")] public string? SfFilter { get; set; }
+
+    private CardSearchQuery _form = new();
+    private HashSet<char> _colors = [];
+    private IReadOnlyList<SetInfo> _sets = [];
+    private PagedResult<CardSummary>? _result;
+    private Dictionary<string, long> _owned = new();
+    private bool _loading;
+    private bool _numberMode;
+    private Toast? _toast;
+
+    // Search-as-you-type state.
+    private CancellationTokenSource? _debounce;
+    private bool _selfNavigation;   // URL change came from this page → keep what's in the input boxes
+    private int _searchVersion;     // drops results of searches that were overtaken by newer ones
+
+    protected override async Task OnInitializedAsync()
+    {
+        _sets = await Cards.GetSetsAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var query = QueryFromUrl();
+
+        // While typing, the user may already be further along than the URL – don't overwrite the text boxes.
+        // (Back/forward navigation is not a self-navigation, so then the form is restored from the URL.)
+        var typed = _form;
+        _form = QueryFromUrl();
+        if (_selfNavigation)
+        {
+            _form.Name = typed.Name;
+            _form.Type = typed.Type;
+            _form.Text = typed.Text;
+            _form.Scryfall = typed.Scryfall;
+            _selfNavigation = false;
+        }
+        _colors = (ColorsFilter ?? "").ToUpperInvariant().Where(ch => "WUBRGC".Contains(ch)).ToHashSet();
+
+        var version = ++_searchVersion;
+        if (!query.HasCriteria)
+        {
+            _result = null;
+            _loading = false;
+            return;
+        }
+
+        _loading = true;
+        var result = await Cards.SearchAsync(query);
+        var owned = await Collection.GetOwnedCountsAsync(result.Items.Select(c => c.Uuid));
+        if (version != _searchVersion) return;
+
+        _result = result;
+        _owned = owned;
+        _numberMode = query.HasCollectorNumber;
+        _loading = false;
+    }
+
+    private CardSearchQuery QueryFromUrl() => new()
+    {
+        Name = Q,
+        Type = TypeFilter,
+        Text = TextFilter,
+        SetCode = SetFilter,
+        Rarity = RarityFilter,
+        Colors = ColorsFilter,
+        IncludeNonPaper = All ?? false,
+        Scryfall = SfFilter,
+        Page = PageNumber ?? 1,
+    };
+
+    /// <summary>Text boxes: search as you type, 300 ms after the last keystroke.</summary>
+    private async Task ScheduleSearchAsync()
+    {
+        _debounce?.Cancel();
+        var cts = _debounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        Navigate(1);
+    }
+
+    /// <summary>Dropdowns, checkboxes, colours and Enter: search immediately.</summary>
+    private void SearchNow()
+    {
+        _debounce?.Cancel();
+        Navigate(1);
+    }
+
+    public void Dispose() => _debounce?.Cancel();
+
+    private void ToggleColor(char c)
+    {
+        if (!_colors.Remove(c)) _colors.Add(c);
+        SearchNow();
+    }
+
+    private void GoToPage(int page) => Navigate(page, addToHistory: true);
+
+    /// <summary>
+    /// Pushes the form into the URL; OnParametersSetAsync then runs the search. Filter changes replace the
+    /// current history entry (Back doesn't step through every keystroke); paging adds one.
+    /// </summary>
+    private void Navigate(int page, bool addToHistory = false)
+    {
+        static string? N(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+        var colors = new string("WUBRGC".Where(_colors.Contains).ToArray());
+        var uri = Nav.GetUriWithQueryParameters(new Dictionary<string, object?>
+        {
+            ["q"] = N(_form.Name),
+            ["type"] = N(_form.Type),
+            ["text"] = N(_form.Text),
+            ["set"] = N(_form.SetCode),
+            ["rarity"] = N(_form.Rarity),
+            ["colors"] = N(colors),
+            ["all"] = _form.IncludeNonPaper ? true : null,
+            ["sf"] = N(_form.Scryfall),
+            ["page"] = page > 1 ? page : null,
+        });
+        if (uri == Nav.Uri) return;
+        _selfNavigation = true;
+        Nav.NavigateTo(uri, replace: !addToHistory);
+    }
+
+    private void Clear()
+    {
+        _debounce?.Cancel();
+        _form = new CardSearchQuery();
+        _colors.Clear();
+        Nav.NavigateTo("search");
+    }
+
+    private async Task QuickAdd(CardSummary card, string finish)
+    {
+        await Collection.AddAsync(new AddCardsRequest
+        {
+            CardUuid = card.Uuid,
+            Name = card.Name,
+            SetCode = card.SetCode,
+            Number = card.Number,
+            Finish = finish,
+            Language = card.Language ?? "English",
+        });
+        _owned[card.Uuid] = _owned.GetValueOrDefault(card.Uuid) + 1;
+        _toast?.Show($"Added {card.Name} ({card.SetCode} #{card.Number}, {CardFinishes.Label(finish)})");
+    }
+}

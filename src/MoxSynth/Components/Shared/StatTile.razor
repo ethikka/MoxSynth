@@ -1,0 +1,11 @@
+<div class="col-6 col-md-4 col-xl-2">
+    <div class="card card-body text-center h-100">
+        <div class="stat-value">@Value.ToString("N0")</div>
+        <div class="text-muted small">@Label</div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public long Value { get; set; }
+}

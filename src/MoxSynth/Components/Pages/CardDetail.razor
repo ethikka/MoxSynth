@@ -1,0 +1,318 @@
+@page "/card/{Uuid}"
+@inject CardRepository Cards
+@inject CollectionRepository Collection
+
+<PageTitle>@(_card?.Name ?? "Card") · MoxSynth</PageTitle>
+
+@if (_loading)
+{
+    <p class="text-muted">Loading…</p>
+}
+else if (_card is null)
+{
+    <div class="alert alert-secondary">Card <code>@Uuid</code> was not found in the card database.</div>
+}
+else
+{
+    var p = _card.Primary;
+    <div class="row g-4">
+        <div class="col-md-4 col-xl-3 text-center">
+            @if (ScryfallImages.Url(p.ScryfallId) is { } front)
+            {
+                <img class="card-image mb-3" src="@front" alt="@p.Name" />
+            }
+            @if (_card.HasBackImage && ScryfallImages.Url(p.ScryfallId, back: true) is { } back)
+            {
+                <img class="card-image mb-3" src="@back" alt="@p.Name (back)" />
+            }
+        </div>
+
+        <div class="col-md-8 col-xl-5">
+            <h1 class="h3 mb-1">@p.Name</h1>
+            <p class="text-muted mb-3">
+                <SetSymbol KeyruneCode="@p.KeyruneCode" Rarity="@p.Rarity" />
+                @p.SetName (@p.SetCode) · #@p.Number · @p.Rarity
+                @if (!string.IsNullOrEmpty(p.Artist))
+                {
+                    <span> · Illus. @p.Artist</span>
+                }
+            </p>
+
+            @foreach (var face in _card.Faces)
+            {
+                <div class="card mb-2">
+                    <div class="card-header d-flex justify-content-between">
+                        <strong>@face.DisplayName</strong>
+                        <ManaText Text="@face.ManaCost" />
+                    </div>
+                    <div class="card-body">
+                        <div class="fw-semibold small mb-2">@face.Type</div>
+                        <ManaText Text="@face.Text" Class="oracle-text d-block" />
+                        @if (!string.IsNullOrEmpty(face.FlavorText))
+                        {
+                            <p class="fst-italic text-muted small mt-2 mb-0">@face.FlavorText</p>
+                        }
+                        @if (face.Power is not null || face.Toughness is not null)
+                        {
+                            <div class="text-end fw-bold">@face.Power/@face.Toughness</div>
+                        }
+                        @if (face.Loyalty is not null)
+                        {
+                            <div class="text-end fw-bold">Loyalty @face.Loyalty</div>
+                        }
+                        @if (face.Defense is not null)
+                        {
+                            <div class="text-end fw-bold">Defense @face.Defense</div>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_card.OtherPrintings.Count > 0)
+            {
+                <h2 class="h6 mt-4">Other printings (@_card.OtherPrintings.Count)</h2>
+                <div class="list-group small" style="max-height: 320px; overflow-y: auto;">
+                    @foreach (var other in _card.OtherPrintings)
+                    {
+                        var ownedOther = _ownedOther.GetValueOrDefault(other.Uuid);
+                        <a class="list-group-item list-group-item-action d-flex justify-content-between" href="card/@other.Uuid">
+                            <span>
+                                <SetSymbol KeyruneCode="@other.KeyruneCode" Rarity="@other.Rarity" />
+                                @other.SetName (@other.SetCode) #@other.Number
+                            </span>
+                            <span>
+                                @if (ownedOther > 0)
+                                {
+                                    <span class="badge text-bg-success me-2">@ownedOther owned</span>
+                                }
+                                <span class="text-muted">@other.ReleaseDate</span>
+                            </span>
+                        </a>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card mb-3">
+                <div class="card-header"><strong>Add to collection</strong></div>
+                <div class="card-body">
+                    <form @onsubmit="AddAsync">
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <label class="form-label small mb-0">Quantity</label>
+                                <input type="number" class="form-control" min="1" max="1000" @bind="_qty" />
+                            </div>
+                            <div class="col-8">
+                                <label class="form-label small mb-0">Finish</label>
+                                <select class="form-select" @bind="_finish">
+                                    @foreach (var f in _card.FinishList)
+                                    {
+                                        <option value="@f">@CardFinishes.Label(f)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Condition</label>
+                                <select class="form-select" @bind="_condition">
+                                    @foreach (var c in Enum.GetValues<CardCondition>())
+                                    {
+                                        <option value="@c">@c.Label() (@c.Short())</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Language</label>
+                                <select class="form-select" @bind="_language">
+                                    @foreach (var lang in Languages)
+                                    {
+                                        <option value="@lang">@lang</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Purchase price</label>
+                                <input type="number" step="0.01" min="0" class="form-control" @bind="_price" />
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small mb-0">Acquired (optional)</label>
+                                <input type="datetime-local" class="form-control" @bind="_acquiredLocal" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small mb-0">Notes</label>
+                                <input class="form-control" @bind="_notes" placeholder="e.g. binder 2, from trade with Sam" />
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3 w-100">Add @_qty card@(_qty == 1 ? "" : "s")</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Your copies (@_copies.Count(c => c.IsOwned) owned)</strong>
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" id="showRemoved"
+                               checked="@_showRemoved" @onchange="ToggleRemovedAsync" />
+                        <label class="form-check-label small" for="showRemoved">Show removed</label>
+                    </div>
+                </div>
+                @if (_copies.Count == 0)
+                {
+                    <div class="card-body text-muted small">No copies.</div>
+                }
+                else
+                {
+                    <table class="table table-sm mb-0 small">
+                        <thead>
+                            <tr><th>Added</th><th>Finish</th><th>Cond.</th><th>Lang</th><th>Price</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var copy in _copies)
+                            {
+                                <tr class="@(copy.IsOwned ? "" : "text-muted")" title="@copy.Notes">
+                                    <td>@SqliteTime.Display(copy.AddedAt)</td>
+                                    <td>@CardFinishes.Label(copy.Finish)</td>
+                                    <td>@copy.Condition.Short()</td>
+                                    <td>@copy.Language</td>
+                                    <td>@(copy.PurchasePrice?.ToString("0.00"))</td>
+                                    <td class="text-end text-nowrap">
+                                        @if (copy.IsOwned)
+                                        {
+                                            <button class="btn btn-outline-danger btn-sm py-0" @onclick="() => _removingId = copy.Id">Remove</button>
+                                        }
+                                        else
+                                        {
+                                            <span class="me-1">Removed @SqliteTime.Display(copy.RemovedAt)@(copy.RemovalReason is null ? "" : $" ({copy.RemovalReason})")</span>
+                                            <button class="btn btn-outline-secondary btn-sm py-0" @onclick="() => RestoreAsync(copy.Id)">Undo</button>
+                                        }
+                                    </td>
+                                </tr>
+                                @if (_removingId == copy.Id)
+                                {
+                                    <tr class="table-warning">
+                                        <td colspan="6">
+                                            <div class="d-flex gap-2 align-items-center">
+                                                <span>Reason:</span>
+                                                <select class="form-select form-select-sm w-auto" @bind="_removalReason">
+                                                    @foreach (var r in RemovalReasons.All)
+                                                    {
+                                                        <option value="@r">@r</option>
+                                                    }
+                                                </select>
+                                                <button class="btn btn-danger btn-sm" @onclick="() => RemoveAsync(copy.Id)">Confirm removal</button>
+                                                <button class="btn btn-link btn-sm" @onclick="() => _removingId = null">Cancel</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+<Toast @ref="_toast" />
+
+@code {
+    private static readonly string[] Languages =
+    [
+        "English", "German", "French", "Italian", "Spanish", "Portuguese (Brazil)", "Japanese", "Korean",
+        "Russian", "Chinese Simplified", "Chinese Traditional", "Phyrexian",
+    ];
+
+    [Parameter] public string Uuid { get; set; } = "";
+
+    private CardDetails? _card;
+    private bool _loading = true;
+    private IReadOnlyList<CollectionCard> _copies = [];
+    private Dictionary<string, long> _ownedOther = new();
+    private bool _showRemoved;
+    private Toast? _toast;
+
+    // add form
+    private int _qty = 1;
+    private string _finish = CardFinishes.NonFoil;
+    private CardCondition _condition = CardCondition.NearMint;
+    private string _language = "English";
+    private double? _price;
+    private DateTime? _acquiredLocal;
+    private string? _notes;
+
+    // remove flow
+    private long? _removingId;
+    private string _removalReason = RemovalReasons.All[0];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _card = await Cards.GetDetailsAsync(Uuid);
+        if (_card is not null)
+        {
+            _finish = _card.FinishList[0];
+            _language = _card.Primary.Language ?? "English";
+            _ownedOther = await Collection.GetOwnedCountsAsync(_card.OtherPrintings.Select(o => o.Uuid));
+            await LoadCopiesAsync();
+        }
+        _loading = false;
+    }
+
+    private async Task LoadCopiesAsync()
+    {
+        if (_card is null) return;
+        _copies = await Collection.GetCopiesAsync(_card.Uuid, _showRemoved);
+    }
+
+    private async Task ToggleRemovedAsync(ChangeEventArgs e)
+    {
+        _showRemoved = e.Value is true;
+        await LoadCopiesAsync();
+    }
+
+    private async Task AddAsync()
+    {
+        if (_card is null) return;
+        var qty = Math.Clamp(_qty, 1, 1000);
+        var p = _card.Primary;
+
+        await Collection.AddAsync(new AddCardsRequest
+        {
+            CardUuid = p.Uuid,
+            Name = p.Name,
+            SetCode = p.SetCode,
+            Number = p.Number,
+            Finish = _finish,
+            Condition = _condition,
+            Language = _language,
+            PurchasePrice = _price,
+            Notes = _notes,
+            Quantity = qty,
+            AddedAt = _acquiredLocal is { } local ? DateTime.SpecifyKind(local, DateTimeKind.Local).ToUniversalTime() : null,
+        });
+
+        _toast?.Show($"Added {qty}× {p.Name} ({CardFinishes.Label(_finish)}, {_condition.Short()})");
+        _qty = 1;
+        _price = null;
+        _notes = null;
+        _acquiredLocal = null;
+        await LoadCopiesAsync();
+    }
+
+    private async Task RemoveAsync(long id)
+    {
+        await Collection.RemoveAsync(id, _removalReason);
+        _removingId = null;
+        _toast?.Show("Card removed from collection.", "secondary");
+        await LoadCopiesAsync();
+    }
+
+    private async Task RestoreAsync(long id)
+    {
+        await Collection.RestoreAsync(id);
+        _toast?.Show("Removal undone.");
+        await LoadCopiesAsync();
+    }
+}

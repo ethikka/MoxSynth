@@ -1,0 +1,7 @@
+@* Renders text containing {X} mana/tap symbols. *@
+<span class="@Class">@ManaFormatter.ToHtml(Text)</span>
+
+@code {
+    [Parameter] public string? Text { get; set; }
+    [Parameter] public string? Class { get; set; }
+}

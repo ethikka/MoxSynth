@@ -1,0 +1,66 @@
+@page "/"
+@inject CollectionRepository Collection
+@inject CardRepository Cards
+
+<PageTitle>MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Dashboard</h1>
+
+@if (_stats is null)
+{
+    <p class="text-muted">Loading…</p>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <StatTile Label="Cards owned" Value="@_stats.OwnedCopies" />
+        <StatTile Label="Unique printings" Value="@_stats.UniquePrintings" />
+        <StatTile Label="Unique card names" Value="@_stats.UniqueNames" />
+        <StatTile Label="Added (30 days)" Value="@_stats.AddedLast30Days" />
+        <StatTile Label="Removed (30 days)" Value="@_stats.RemovedLast30Days" />
+        <StatTile Label="Removed (all time)" Value="@_stats.RemovedCopies" />
+    </div>
+
+    <div class="d-flex justify-content-between align-items-baseline">
+        <h2 class="h5">Recent activity</h2>
+        <a href="history" class="small">Full history →</a>
+    </div>
+    @if (_recent.Count == 0)
+    {
+        <div class="alert alert-light">No cards yet. <a href="search">Search for cards</a> to add your first one.</div>
+    }
+    else
+    {
+        <ul class="list-group mb-4">
+            @foreach (var e in _recent)
+            {
+                <li class="list-group-item d-flex justify-content-between small">
+                    <span>
+                        <span class="badge @(e.Kind == "Added" ? "text-bg-success" : "text-bg-secondary") me-2">@e.Kind</span>
+                        <a href="card/@e.CardUuid">@e.Name</a>
+                        <span class="text-muted">(@e.SetCode #@e.Number, @CardFinishes.Label(e.Finish))</span>
+                    </span>
+                    <span class="text-muted">@SqliteTime.Display(e.At)</span>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (_meta is not null)
+    {
+        <p class="text-muted small">Card database: MTGJSON @_meta.Version (@_meta.Date)</p>
+    }
+}
+
+@code {
+    private CollectionStats? _stats;
+    private IReadOnlyList<HistoryEvent> _recent = [];
+    private CardDbMeta? _meta;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await Collection.GetStatsAsync();
+        _recent = (await Collection.GetHistoryAsync(1, 10)).Items;
+        _meta = await Cards.GetMetaAsync();
+    }
+}

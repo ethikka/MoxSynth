@@ -1,0 +1,316 @@
+/* =========================================================================
+   Base (all themes)
+   ========================================================================= */
+
+h1:focus {
+    outline: none;
+}
+
+.card-thumb {
+    width: 44px;
+    border-radius: 3px;
+}
+
+.card-image {
+    width: 100%;
+    max-width: 340px;
+    border-radius: 4.75% / 3.5%;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .25);
+}
+
+.ms-cost {
+    font-size: .85em;
+}
+
+.oracle-text {
+    white-space: normal;
+    line-height: 1.5;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.toast-msg {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1050;
+}
+
+/* Spacing helpers. Bootstrap's ms-1…ms-5 clash with the Mana font's ms-1…ms-5 symbol classes
+   (an element with Bootstrap's "ms-1" would also render a "1" mana glyph), so use these instead. */
+.gap-start-1 {
+    margin-left: .25rem;
+}
+
+.gap-start-2 {
+    margin-left: .5rem;
+}
+
+.theme-select {
+    width: auto;
+    min-width: 8.5rem;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    color: #212529;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 0.75rem;
+    top: 0.5rem;
+}
+
+/* =========================================================================
+   Light
+   ========================================================================= */
+
+[data-bs-theme="light"] body {
+    background: #f6f7f9;
+}
+
+/* =========================================================================
+   Dark – Bootstrap's dark mode, slightly deeper page background
+   ========================================================================= */
+
+[data-bs-theme="dark"]:not(.theme-neon) body {
+    background: #16181c;
+}
+
+[data-bs-theme="dark"] .card-image {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, .6);
+}
+
+/* =========================================================================
+   Neon – synthwave on top of Bootstrap dark mode
+   ========================================================================= */
+
+:root.theme-neon {
+    --neon-pink: #ff2bd6;
+    --neon-pink-rgb: 255, 43, 214;
+    --neon-cyan: #00f0ff;
+    --neon-cyan-rgb: 0, 240, 255;
+    --neon-lime: #a6ff00;
+    --neon-lime-rgb: 166, 255, 0;
+    --neon-violet: #9d4dff;
+    --neon-violet-rgb: 157, 77, 255;
+    --neon-ink: #0b0716;
+
+    --bs-body-bg: var(--neon-ink);
+    --bs-body-bg-rgb: 11, 7, 22;
+    --bs-body-color: #e9e4ff;
+    --bs-body-color-rgb: 233, 228, 255;
+    --bs-secondary-color: rgba(233, 228, 255, .62);
+    --bs-emphasis-color: #fff;
+    --bs-heading-color: #fff;
+    --bs-secondary-bg: #170e2e;
+    --bs-tertiary-bg: #120a24;
+    --bs-tertiary-bg-rgb: 18, 10, 36;
+    --bs-border-color: #3b2468;
+    --bs-border-color-translucent: rgba(var(--neon-violet-rgb), .3);
+
+    --bs-primary: var(--neon-pink);
+    --bs-primary-rgb: var(--neon-pink-rgb);
+    --bs-info-rgb: var(--neon-cyan-rgb);
+    --bs-success-rgb: var(--neon-lime-rgb);
+    --bs-link-color: var(--neon-cyan);
+    --bs-link-color-rgb: var(--neon-cyan-rgb);
+    --bs-link-hover-color: #8ff9ff;
+    --bs-link-hover-color-rgb: 143, 249, 255;
+    --bs-focus-ring-color: rgba(var(--neon-pink-rgb), .4);
+}
+
+.theme-neon body {
+    background:
+        radial-gradient(ellipse 80% 50% at 50% -10%, rgba(var(--neon-violet-rgb), .35), transparent 70%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(var(--neon-pink-rgb), .12), transparent 70%),
+        var(--neon-ink);
+    background-attachment: fixed;
+}
+
+/* Headings & brand */
+.theme-neon h1, .theme-neon .h3, .theme-neon .h5, .theme-neon .h6 {
+    font-family: "Orbitron", system-ui, sans-serif;
+    letter-spacing: .04em;
+    text-shadow: 0 0 6px rgba(var(--neon-cyan-rgb), .65), 0 0 18px rgba(var(--neon-cyan-rgb), .35);
+}
+
+.theme-neon .navbar {
+    background: rgba(11, 7, 22, .82) !important;
+    backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--neon-pink);
+    box-shadow: 0 0 18px rgba(var(--neon-pink-rgb), .45);
+}
+
+.theme-neon .navbar-brand {
+    font-family: "Orbitron", system-ui, sans-serif;
+    font-weight: 700;
+    color: var(--neon-pink) !important;
+    text-shadow: 0 0 6px var(--neon-pink), 0 0 16px rgba(var(--neon-pink-rgb), .7);
+}
+
+.theme-neon .navbar .nav-link.active {
+    color: var(--neon-cyan) !important;
+    text-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), .8);
+}
+
+/* Surfaces */
+.theme-neon .card {
+    --bs-card-bg: rgba(23, 14, 46, .78);
+    --bs-card-cap-bg: rgba(var(--neon-violet-rgb), .12);
+    --bs-card-border-color: rgba(var(--neon-violet-rgb), .45);
+    box-shadow: 0 0 14px rgba(var(--neon-violet-rgb), .18);
+}
+
+.theme-neon .table {
+    --bs-table-bg: rgba(18, 10, 36, .7);
+    --bs-table-hover-bg: rgba(var(--neon-pink-rgb), .08);
+    --bs-table-border-color: rgba(var(--neon-violet-rgb), .3);
+}
+
+.theme-neon .list-group {
+    --bs-list-group-bg: rgba(18, 10, 36, .7);
+    --bs-list-group-border-color: rgba(var(--neon-violet-rgb), .35);
+    --bs-list-group-action-hover-bg: rgba(var(--neon-pink-rgb), .1);
+}
+
+.theme-neon .form-control, .theme-neon .form-select {
+    background-color: rgba(11, 7, 22, .85);
+    border-color: rgba(var(--neon-violet-rgb), .55);
+}
+
+.theme-neon .form-control:focus, .theme-neon .form-select:focus {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 0 .2rem rgba(var(--neon-pink-rgb), .25), 0 0 12px rgba(var(--neon-pink-rgb), .45);
+}
+
+.theme-neon .form-check-input:checked {
+    background-color: var(--neon-pink);
+    border-color: var(--neon-pink);
+}
+
+/* Buttons – outlined tubes that light up on hover */
+.theme-neon .btn-primary {
+    --bs-btn-color: var(--neon-pink);
+    --bs-btn-bg: rgba(var(--neon-pink-rgb), .08);
+    --bs-btn-border-color: var(--neon-pink);
+    --bs-btn-hover-color: var(--neon-ink);
+    --bs-btn-hover-bg: var(--neon-pink);
+    --bs-btn-hover-border-color: var(--neon-pink);
+    --bs-btn-active-color: var(--neon-ink);
+    --bs-btn-active-bg: #ff6be3;
+    --bs-btn-active-border-color: #ff6be3;
+    font-weight: 600;
+    box-shadow: 0 0 8px rgba(var(--neon-pink-rgb), .55), inset 0 0 6px rgba(var(--neon-pink-rgb), .25);
+}
+
+.theme-neon .btn-outline-primary {
+    --bs-btn-color: var(--neon-cyan);
+    --bs-btn-border-color: rgba(var(--neon-cyan-rgb), .7);
+    --bs-btn-hover-color: var(--neon-ink);
+    --bs-btn-hover-bg: var(--neon-cyan);
+    --bs-btn-hover-border-color: var(--neon-cyan);
+    --bs-btn-active-color: var(--neon-ink);
+    --bs-btn-active-bg: var(--neon-cyan);
+    --bs-btn-active-border-color: var(--neon-cyan);
+}
+
+.theme-neon .btn-outline-primary:hover {
+    box-shadow: 0 0 10px rgba(var(--neon-cyan-rgb), .7);
+}
+
+.theme-neon .btn-outline-secondary {
+    --bs-btn-color: #c9a6ff;
+    --bs-btn-border-color: rgba(var(--neon-violet-rgb), .7);
+    --bs-btn-hover-color: var(--neon-ink);
+    --bs-btn-hover-bg: var(--neon-violet);
+    --bs-btn-hover-border-color: var(--neon-violet);
+    --bs-btn-active-color: var(--neon-ink);
+    --bs-btn-active-bg: var(--neon-violet);
+    --bs-btn-active-border-color: var(--neon-violet);
+}
+
+.theme-neon .btn-check:checked + .btn-outline-secondary {
+    box-shadow: 0 0 10px rgba(var(--neon-violet-rgb), .8);
+}
+
+.theme-neon .btn-link {
+    --bs-btn-color: var(--neon-cyan);
+    --bs-btn-hover-color: #8ff9ff;
+}
+
+/* Badges, pagination, alerts */
+.theme-neon .text-bg-success {
+    color: var(--neon-ink) !important;
+    box-shadow: 0 0 8px rgba(var(--neon-lime-rgb), .6);
+}
+
+.theme-neon .text-bg-info {
+    color: var(--neon-ink) !important;
+    box-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), .6);
+}
+
+.theme-neon .pagination {
+    --bs-pagination-bg: rgba(18, 10, 36, .8);
+    --bs-pagination-border-color: rgba(var(--neon-violet-rgb), .45);
+    --bs-pagination-color: var(--neon-cyan);
+    --bs-pagination-hover-bg: rgba(var(--neon-pink-rgb), .15);
+    --bs-pagination-hover-color: #fff;
+    --bs-pagination-active-bg: var(--neon-pink);
+    --bs-pagination-active-border-color: var(--neon-pink);
+    --bs-pagination-active-color: var(--neon-ink);
+}
+
+.theme-neon .page-item.active .page-link {
+    box-shadow: 0 0 10px rgba(var(--neon-pink-rgb), .7);
+}
+
+.theme-neon .alert-success {
+    --bs-alert-color: var(--neon-lime);
+    --bs-alert-bg: rgba(11, 7, 22, .92);
+    --bs-alert-border-color: var(--neon-lime);
+    box-shadow: 0 0 14px rgba(var(--neon-lime-rgb), .45);
+}
+
+.theme-neon .alert-light {
+    --bs-alert-bg: rgba(23, 14, 46, .7);
+    --bs-alert-color: var(--bs-body-color);
+    --bs-alert-border-color: rgba(var(--neon-violet-rgb), .4);
+}
+
+/* Cards & stats glow */
+.theme-neon .card-image {
+    box-shadow: 0 0 18px rgba(var(--neon-violet-rgb), .55);
+    transition: box-shadow .2s;
+}
+
+.theme-neon .card-image:hover {
+    box-shadow: 0 0 26px rgba(var(--neon-pink-rgb), .75);
+}
+
+.theme-neon .card-thumb {
+    box-shadow: 0 0 6px rgba(var(--neon-violet-rgb), .6);
+}
+
+.theme-neon .stat-value {
+    font-family: "Orbitron", system-ui, sans-serif;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), .8), 0 0 22px rgba(var(--neon-cyan-rgb), .4);
+}
