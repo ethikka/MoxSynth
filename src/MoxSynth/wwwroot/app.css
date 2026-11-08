@@ -314,3 +314,174 @@ h1:focus {
     color: var(--neon-cyan);
     text-shadow: 0 0 8px rgba(var(--neon-cyan-rgb), .8), 0 0 22px rgba(var(--neon-cyan-rgb), .4);
 }
+
+/* =========================================================================
+   Card scanner
+   ========================================================================= */
+
+.scanner-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1060;
+    background: rgba(0, 0, 0, .65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.scanner-dialog {
+    width: min(720px, 100%);
+    max-height: 100%;
+    overflow: auto;
+}
+
+.scanner-video-wrap {
+    position: relative;
+    background: #000;
+    border-radius: .375rem;
+    overflow: hidden;
+}
+
+.scanner-video {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Card outline; regions mirror TITLE / BOTTOM in scanner.js. */
+.scanner-guide {
+    position: absolute;
+    border: 2px solid rgba(255, 255, 255, .9);
+    border-radius: 4.75% / 3.5%;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, .45);
+    pointer-events: none;
+}
+
+.scanner-region {
+    position: absolute;
+    border: 2px dashed #ffd43b;
+    border-radius: 3px;
+}
+
+.scanner-region-title {
+    left: 4%;
+    top: 2%;
+    width: 74%;
+    height: 10%;
+}
+
+.scanner-region-bottom {
+    left: 2%;
+    top: 86%;
+    width: 56%;
+    height: 13%;
+}
+
+.theme-neon .scanner-guide {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 0 9999px rgba(11, 7, 22, .55), 0 0 18px rgba(var(--neon-cyan-rgb), .8);
+}
+
+.theme-neon .scanner-region {
+    border-color: var(--neon-pink);
+}
+
+/* =========================================================================
+   Profiles
+   ========================================================================= */
+
+.profile-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.profile-picker {
+    min-height: 100vh;
+}
+
+.profile-picker-brand {
+    font-size: 1.1rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+}
+
+.profile-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    width: 140px;
+    padding: 1rem .5rem;
+    border: 2px solid transparent;
+    border-radius: 1rem;
+    background: transparent;
+    color: var(--bs-body-color);
+    transition: border-color .15s, transform .15s;
+}
+
+.profile-tile:hover, .profile-tile:focus-visible {
+    border-color: var(--bs-primary);
+    transform: translateY(-2px);
+    outline: none;
+}
+
+.profile-tile-name {
+    font-weight: 600;
+}
+
+.profile-form {
+    max-width: 380px;
+}
+
+.profile-tile.selected {
+    border-color: var(--bs-primary);
+}
+
+.color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .35);
+    padding: 0;
+}
+
+.color-swatch.selected {
+    border-color: var(--bs-body-color);
+}
+
+.profile-menu {
+    position: relative;
+}
+
+.profile-menu-list {
+    position: absolute; /* don't rely on Bootstrap's dropdown styles: must sit above the backdrop */
+    right: 0;
+    left: auto;
+    top: calc(100% + .25rem);
+    z-index: 1050;
+}
+
+.profile-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1040;
+}
+
+.theme-neon .profile-tile:hover, .theme-neon .profile-tile:focus-visible {
+    border-color: var(--neon-pink);
+    box-shadow: 0 0 16px rgba(var(--neon-pink-rgb), .5);
+}
+
+.theme-neon .profile-avatar {
+    box-shadow: 0 0 10px rgba(var(--neon-violet-rgb), .7);
+}

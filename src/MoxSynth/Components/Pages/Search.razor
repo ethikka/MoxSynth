@@ -107,7 +107,8 @@
             <label class="form-check-label small" for="nonpaper">Include online-only (MTGO/Arena)</label>
         </div>
         <div class="ms-auto">
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Clear">Clear</button>
+            <button type="button" class="btn btn-outline-primary btn-sm" @onclick="() => _scanner!.ShowAsync()" title="Recognise a card with your camera">📷 Scan card</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm gap-start-1" @onclick="Clear">Clear</button>
         </div>
     </div>
 </form>
@@ -184,6 +185,7 @@ else if (_result is not null)
 }
 
 <Toast @ref="_toast" />
+<CardScanner @ref="_scanner" OnRecognized="ApplyScan" />
 
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
@@ -204,6 +206,7 @@ else if (_result is not null)
     private bool _loading;
     private bool _numberMode;
     private Toast? _toast;
+    private CardScanner? _scanner;
 
     // Search-as-you-type state.
     private CancellationTokenSource? _debounce;
@@ -322,6 +325,23 @@ else if (_result is not null)
         if (uri == Nav.Uri) return;
         _selfNavigation = true;
         Nav.NavigateTo(uri, replace: !addToHistory);
+    }
+
+    /// <summary>A scanned card: show exactly that card (and printing, when set + number were readable).</summary>
+    private void ApplyScan(CardRecognition card)
+    {
+        _debounce?.Cancel();
+        _colors.Clear();
+        _form = new CardSearchQuery
+        {
+            Scryfall = $"!\"{card.Name}\"",
+            SetCode = card.SetCode,
+            Name = card.Number,
+        };
+        Navigate(1, addToHistory: true);
+
+        var printing = card.IsExactPrinting ? $" ({card.SetCode} #{card.Number})" : card.SetCode is not null ? $" ({card.SetCode})" : "";
+        _toast?.Show($"Recognised {card.Name}{printing}");
     }
 
     private void Clear()

@@ -42,6 +42,29 @@
             <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ClearAsync">Clear</button>
         </div>
     </div>
+    <div class="row g-2 mt-1">
+        <div class="col-12">
+            <label class="form-label small mb-0">
+                Scryfall syntax
+                <a class="gap-start-1" href="https://scryfall.com/docs/syntax" target="_blank" rel="noopener">reference</a>
+            </label>
+            <input class="form-control font-monospace" autocomplete="off" spellcheck="false"
+                   placeholder="e.g. t:creature c:g pow>=4   or   f:commander id<=esper -is:foil order:mv"
+                   @bind="_query.Scryfall" @bind:event="oninput" @bind:after="ScheduleSearchAsync" />
+            @if (!string.IsNullOrWhiteSpace(_query.Scryfall))
+            {
+                var parsed = Cards.ParseScryfall(_query.Scryfall, CardRepository.CollectionFinishColumn);
+                @if (parsed.Description is not null)
+                {
+                    <div class="form-text">Cards in your collection where @parsed.Description</div>
+                }
+                @foreach (var warning in parsed.Warnings)
+                {
+                    <div class="form-text text-warning-emphasis">⚠ @warning</div>
+                }
+            }
+        </div>
+    </div>
 </form>
 
 @if (_page is null)
@@ -187,6 +210,7 @@ else
         _query.Name = null;
         _query.SetCode = null;
         _query.Finish = null;
+        _query.Scryfall = null;
         _query.AsOf = null;
         _asOfLocal = null;
         _query.Page = 1;

@@ -54,7 +54,11 @@ public sealed class CardRepository(DatabasePaths paths)
     }
 
     /// <summary>Parses a Scryfall-syntax query (for previewing the interpretation and warnings in the UI).</summary>
-    public ScryfallFilter ParseScryfall(string? query) => ScryfallQueryParser.Parse(query, Formats);
+    public ScryfallFilter ParseScryfall(string? query, string? ownedFinishColumn = null) =>
+        ScryfallQueryParser.Parse(query, Formats, ownedFinishColumn);
+
+    /// <summary>Column with the owned copy's finish in collection queries (see <c>CollectionRepository</c>).</summary>
+    public const string CollectionFinishColumn = "cc.finish";
 
     public async Task<PagedResult<CardSummary>> SearchAsync(CardSearchQuery query, CancellationToken ct = default)
     {

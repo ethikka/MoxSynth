@@ -1,0 +1,48 @@
+@page "/account"
+@using Microsoft.AspNetCore.WebUtilities
+@inject CurrentProfile Current
+@inject NavigationManager Nav
+
+<PageTitle>Account · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Your account</h1>
+
+<div class="d-flex align-items-center gap-3 mb-4">
+    <ProfileAvatar Profile="Current.Value" Size="56" />
+    <div>
+        <div class="fw-semibold">@Current.Value?.Name</div>
+        <div class="small text-body-secondary">@(Current.IsAdmin ? "Admin" : "Collector")</div>
+    </div>
+</div>
+
+<div class="card profile-form">
+    <div class="card-header"><strong>Change password</strong></div>
+    <div class="card-body">
+        @if (_changed)
+        {
+            <div class="alert alert-success py-2">Your password has been changed.</div>
+        }
+        @* Plain form post: the server checks the current password, saves the new one and renews the sign-in cookie. *@
+        <form method="post" action="profile/change-password">
+            <AntiforgeryToken />
+            <input type="text" name="username" value="@Current.Value?.Name" autocomplete="username" hidden />
+            <label class="form-label small mb-0" for="current-password">Current password</label>
+            <input id="current-password" name="current" type="password" class="form-control" required autocomplete="current-password" />
+            <PasswordFields Label="New password" />
+            <ErrorMessage Code="@_error" />
+            <button type="submit" class="btn btn-primary mt-3">Change password</button>
+        </form>
+    </div>
+</div>
+
+@code {
+    private string? _error;
+    private bool _changed;
+
+    protected override void OnInitialized()
+    {
+        var query = QueryHelpers.ParseQuery(new Uri(Nav.Uri).Query);
+        _error = query.TryGetValue("error", out var e) ? e.ToString() : null;
+        _changed = query.ContainsKey("changed");
+    }
+}

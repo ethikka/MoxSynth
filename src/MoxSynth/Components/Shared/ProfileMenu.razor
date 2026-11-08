@@ -1,0 +1,39 @@
+@inject CurrentProfile Current
+@implements IDisposable
+
+<div class="profile-menu">
+    <button type="button" class="btn btn-sm btn-dark d-flex align-items-center gap-2" @onclick="() => _open = !_open"
+            aria-expanded="@(_open ? "true" : "false")">
+        <ProfileAvatar Profile="Current.Value" Size="26" />
+        <span class="d-none d-md-inline">@Current.Value?.Name</span>
+        <span class="small">▾</span>
+    </button>
+    @if (_open)
+    {
+        <div class="profile-menu-backdrop" @onclick="() => _open = false"></div>
+        <div class="dropdown-menu dropdown-menu-end show profile-menu-list">
+            <h6 class="dropdown-header">Signed in as @Current.Value?.Name</h6>
+            <a class="dropdown-item" href="account" @onclick="() => _open = false">Change password</a>
+            @if (Current.IsAdmin)
+            {
+                <a class="dropdown-item" href="profiles" @onclick="() => _open = false">Manage profiles</a>
+            }
+            <div class="dropdown-divider"></div>
+            @* Plain form post: the server removes the sign-in cookie and reloads to the profile picker. *@
+            <form method="post" action="profile/logout" class="m-0">
+                <AntiforgeryToken />
+                <button type="submit" class="dropdown-item">Sign out / switch profile</button>
+            </form>
+        </div>
+    }
+</div>
+
+@code {
+    private bool _open;
+
+    protected override void OnInitialized() => Current.Changed += OnProfileChanged;
+
+    private void OnProfileChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Current.Changed -= OnProfileChanged;
+}

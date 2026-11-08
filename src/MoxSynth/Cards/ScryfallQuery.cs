@@ -68,6 +68,7 @@ public sealed class ScryfallQueryParser
     };
 
     private readonly IReadOnlySet<string> _formats;
+    private readonly string? _ownedFinishColumn;
     private readonly DynamicParameters _p = new();
     private readonly List<string> _warnings = [];
     private List<Token> _tokens = [];
@@ -77,13 +78,21 @@ public sealed class ScryfallQueryParser
     private string? _orderLabel;
     private bool _descending;
 
-    private ScryfallQueryParser(IReadOnlySet<string> formats) => _formats = formats;
+    private ScryfallQueryParser(IReadOnlySet<string> formats, string? ownedFinishColumn)
+    {
+        _formats = formats;
+        _ownedFinishColumn = ownedFinishColumn;
+    }
 
     /// <param name="formats">Valid format column names of the cardLegalities table (whitelist for f:/legal:).</param>
-    public static ScryfallFilter Parse(string? input, IReadOnlySet<string> formats)
+    /// <param name="ownedFinishColumn">
+    /// When searching a collection: SQL column with the finish of the owned copy (e.g. <c>cc.finish</c>).
+    /// is:foil / is:nonfoil / is:etched then mean "my copy is foil" instead of "this printing exists in foil".
+    /// </param>
+    public static ScryfallFilter Parse(string? input, IReadOnlySet<string> formats, string? ownedFinishColumn = null)
     {
         if (string.IsNullOrWhiteSpace(input)) return ScryfallFilter.Empty;
-        return new ScryfallQueryParser(formats).Run(input);
+        return new ScryfallQueryParser(formats, ownedFinishColumn).Run(input);
     }
 
     private ScryfallFilter Run(string input)
@@ -451,6 +460,14 @@ public sealed class ScryfallQueryParser
             "(" + string.Join(" OR ", types.Select(x => $"COALESCE(f.type, '') LIKE '%{x}%'")) + ")";
 
         var v = value.ToLowerInvariant();
+        if (_ownedFinishColumn is not null && v is "foil" or "nonfoil" or "etched")
+        {
+            var owned = $"{_ownedFinishColumn} = '{v}'"; // v is one of three literals
+            return negate
+                ? new Fragment($"NOT ({owned})", $"your copy is not {v}")
+                : new Fragment(owned, $"your copy is {v}");
+        }
+
         string? sql = v switch
         {
             "foil" or "nonfoil" or "etched" => Finish(v),

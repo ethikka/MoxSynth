@@ -1,0 +1,127 @@
+@using Microsoft.AspNetCore.WebUtilities
+@inject ProfileStore Profiles
+@inject NavigationManager Nav
+
+<PageTitle>Who's collecting? · MoxSynth</PageTitle>
+
+@* The forms below are plain HTML posts to /profile/* (not Blazor handlers): the server sets the sign-in cookie
+   and redirects, which reloads the app for the signed-in profile. *@
+<div class="profile-picker">
+    <div class="d-flex justify-content-end p-3">
+        <ThemeSelector />
+    </div>
+
+    <div class="container text-center py-4">
+        <div class="profile-picker-brand mb-2">MoxSynth</div>
+
+        @if (_profiles.Count == 0)
+        {
+            <h1 class="h3 mb-3">Welcome! Create the first profile</h1>
+            <p class="text-body-secondary">
+                The first profile is the admin: it can add profiles for other people later.
+                Every profile gets its own collection and password.
+            </p>
+            <form class="profile-form mx-auto text-start" method="post" action="profile/setup">
+                <AntiforgeryToken />
+                <input type="hidden" name="color" value="@_newColor" />
+                <label class="form-label small mb-0" for="setup-name">Name</label>
+                <input id="setup-name" name="name" class="form-control mb-3" required maxlength="40" placeholder="Your name" autocomplete="username" />
+                <label class="form-label small mb-1 d-block">Colour</label>
+                <ColorChooser @bind-Value="_newColor" />
+                <PasswordFields />
+                <ErrorMessage Code="@_error" />
+                <button type="submit" class="btn btn-primary w-100 mt-3">Create profile</button>
+            </form>
+        }
+        else
+        {
+            <h1 class="h3 mb-4">Who's collecting?</h1>
+            <div class="d-flex flex-wrap justify-content-center gap-4">
+                @foreach (var profile in _profiles)
+                {
+                    var p = profile;
+                    <button type="button" class="profile-tile @(p.Id == _selected?.Id ? "selected" : "")" @onclick="() => Select(p)">
+                        <ProfileAvatar Profile="p" Size="96" />
+                        <span class="profile-tile-name">@p.Name</span>
+                        @if (p.IsAdmin)
+                        {
+                            <span class="badge text-bg-secondary">admin</span>
+                        }
+                    </button>
+                }
+            </div>
+
+            @if (_selected is { } selected)
+            {
+                @if (selected.HasPassword)
+                {
+                    <form class="profile-form mx-auto text-start mt-4" method="post" action="profile/login" @key="selected.Id">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="id" value="@selected.Id" />
+                        <input type="hidden" name="returnUrl" value="@_returnUrl" />
+                        <input type="text" name="username" value="@selected.Name" autocomplete="username" hidden />
+                        <label class="form-label small mb-0" for="login-password">Password for @selected.Name</label>
+                        <input id="login-password" name="password" type="password" class="form-control" required autofocus
+                               autocomplete="current-password" />
+                        <ErrorMessage Code="@_error" />
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => Select(null)">Cancel</button>
+                            <button type="submit" class="btn btn-primary flex-grow-1">Sign in</button>
+                        </div>
+                        <p class="small text-body-secondary mt-3 mb-0">Forgot your password? An admin can set a new one.</p>
+                    </form>
+                }
+                else
+                {
+                    <form class="profile-form mx-auto text-start mt-4" method="post" action="profile/set-password" @key="selected.Id">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="id" value="@selected.Id" />
+                        <input type="hidden" name="returnUrl" value="@_returnUrl" />
+                        <input type="text" name="username" value="@selected.Name" autocomplete="username" hidden />
+                        <p class="small mb-2"><strong>@selected.Name</strong> doesn't have a password yet. Choose one to protect this collection.</p>
+                        <PasswordFields />
+                        <ErrorMessage Code="@_error" />
+                        <div class="d-flex gap-2 mt-3">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="() => Select(null)">Cancel</button>
+                            <button type="submit" class="btn btn-primary flex-grow-1">Set password &amp; sign in</button>
+                        </div>
+                    </form>
+                }
+            }
+            else
+            {
+                <p class="text-body-secondary small mt-4">New profiles can be added by an admin under “Manage profiles”.</p>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private IReadOnlyList<Profile> _profiles = [];
+    private Profile? _selected;
+    private string? _error;
+    private string _returnUrl = "/";
+    private string _newColor = ProfileColors.All[3];
+
+    protected override void OnInitialized()
+    {
+        _profiles = Profiles.GetAll();
+
+        // After a failed attempt the server redirects to /?profile={id}&error={code}.
+        var uri = new Uri(Nav.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("error", out var error)) _error = error.ToString();
+        if (query.TryGetValue("profile", out var id) && long.TryParse(id, out var profileId))
+            _selected = _profiles.FirstOrDefault(p => p.Id == profileId);
+
+        // Come back to the page that was opened (without our own query parameters).
+        var path = uri.AbsolutePath;
+        _returnUrl = query.ContainsKey("profile") || query.ContainsKey("error") ? path : path + uri.Query;
+    }
+
+    private void Select(Profile? profile)
+    {
+        _selected = profile;
+        _error = null;
+    }
+}

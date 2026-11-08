@@ -1,0 +1,247 @@
+@page "/import"
+@inject ArchidektImporter Importer
+@inject CollectionRepository Collection
+
+<PageTitle>Import · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Import from Archidekt</h1>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <ol class="small mb-3">
+            <li>On Archidekt, open <strong>Collection</strong> → <strong>Export</strong> and download it as <strong>CSV</strong>.
+                Include at least <em>Quantity</em>, <em>Name</em> and <em>Edition Code</em> / <em>Collector Number</em> or
+                <em>Scryfall ID</em> (best: exact printing). <em>Finish</em>, <em>Condition</em>, <em>Language</em>,
+                <em>Purchase Price</em>, <em>Date Added</em> and <em>Tags</em> are used when present.</li>
+            <li>Choose the file below, check the preview and press <strong>Import</strong>.</li>
+        </ol>
+        @* @key: re-create the input after each file so choosing the same file again fires a change event. *@
+        <InputFile @key="_inputKey" OnChange="OnFileSelectedAsync" accept=".csv,text/csv" class="form-control" disabled="@_busy" />
+        @if (_busy)
+        {
+            <div class="small text-body-secondary mt-2">
+                <span class="spinner-border spinner-border-sm me-1"></span> @_busyText
+            </div>
+        }
+        @if (_fileError is not null)
+        {
+            <div class="alert alert-danger py-2 mt-3 mb-0">@_fileError</div>
+        }
+    </div>
+</div>
+
+@if (_done is not null)
+{
+    <div class="alert alert-success">
+        Imported <strong>@_done.CardCount.ToString("N0")</strong> cards from @_done.FileName.
+        <a href="collection" class="gap-start-1">View your collection →</a>
+    </div>
+}
+
+@if (_preview is not null)
+{
+    @foreach (var error in _preview.Errors)
+    {
+        <div class="alert alert-danger">@error</div>
+    }
+
+    @if (_preview.Rows.Count > 0)
+    {
+        <div class="card mb-4">
+            <div class="card-header d-flex flex-wrap gap-3 align-items-center">
+                <strong>Preview: @_preview.FileName</strong>
+                <span class="badge text-bg-success">@_preview.MatchedCards.ToString("N0") cards recognised</span>
+                @if (_preview.UnmatchedCards > 0 || _preview.Unmatched.Any())
+                {
+                    <span class="badge text-bg-warning">@_preview.Unmatched.Count() rows not recognised (@_preview.UnmatchedCards.ToString("N0") cards)</span>
+                }
+            </div>
+            <div class="card-body">
+                @if (_previousImport is not null)
+                {
+                    <div class="alert alert-warning py-2">
+                        This exact file was already imported on @SqliteTime.Display(_previousImport.ImportedAt).
+                        Importing again adds every card a second time.
+                    </div>
+                }
+
+                <p class="small mb-2">
+                    Every imported card gets a note like
+                    <code>Imported from Archidekt @DateTime.Now.ToString("yyyy-MM-dd") · added there 2023-05-12</code>
+                    (plus Archidekt tags, when present). Conditions are converted to the Cardmarket scale
+                    (NM → NM, LP → EX, MP → GD, HP → PL, Damaged → PO).
+                </p>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="useDates" @bind="_useOriginalDates" />
+                    <label class="form-check-label small" for="useDates">
+                        Also use Archidekt's “Date Added” as the added date in MoxSynth (otherwise today; the original date is always in the note)
+                    </label>
+                </div>
+
+                <button class="btn btn-primary" disabled="@(_busy || _preview.MatchedCards == 0)" @onclick="ImportAsync">
+                    Import @_preview.MatchedCards.ToString("N0") cards
+                </button>
+                <button class="btn btn-link" disabled="@_busy" @onclick="() => _preview = null">Cancel</button>
+            </div>
+        </div>
+
+        @if (_preview.Unmatched.Any())
+        {
+            <h2 class="h6">Not recognised (will be skipped)</h2>
+            <table class="table table-sm small mb-4">
+                <thead><tr><th>Line</th><th>Qty</th><th>Name</th><th>Set</th><th>#</th><th>Problem</th></tr></thead>
+                <tbody>
+                    @foreach (var row in _preview.Unmatched)
+                    {
+                        <tr class="table-warning">
+                            <td>@row.Line</td><td>@row.Quantity</td><td>@row.Name</td><td>@row.SetCode</td><td>@row.Number</td><td>@row.Problem</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+
+        <h2 class="h6">Recognised @(_preview.Matched.Count() > PreviewLimit ? $"(first {PreviewLimit} of {_preview.Matched.Count():N0} rows)" : "")</h2>
+        <table class="table table-sm small">
+            <thead>
+                <tr><th>Qty</th><th>Card</th><th>Set</th><th>#</th><th>Finish</th><th>Cond.</th><th>Lang</th><th>Price</th><th>Added on Archidekt</th><th>Matched by</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _preview.Matched.Take(PreviewLimit))
+                {
+                    <tr>
+                        <td>@row.Quantity</td>
+                        <td><a href="card/@row.Card!.Uuid" target="_blank">@row.Card.Name</a></td>
+                        <td>@row.Card.SetCode</td>
+                        <td>@row.Card.Number</td>
+                        <td>@CardFinishes.Label(row.Finish)</td>
+                        <td title="@row.ConditionText">@row.Condition.Short()</td>
+                        <td>@row.Language</td>
+                        <td>@(row.PurchasePrice?.ToString("0.00"))</td>
+                        <td>@(row.DateAdded?.ToLocalTime().ToString("yyyy-MM-dd"))</td>
+                        <td class="text-body-secondary">@row.MatchedBy</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@if (_imports.Count > 0)
+{
+    <h2 class="h5 mt-4">Previous imports</h2>
+    <table class="table table-sm">
+        <thead><tr><th>When</th><th>Source</th><th>File</th><th class="text-end">Cards</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var record in _imports)
+            {
+                var r = record;
+                <tr class="@(r.UndoneAt is null ? "" : "text-body-secondary")">
+                    <td class="small">@SqliteTime.Display(r.ImportedAt)</td>
+                    <td>@r.Source</td>
+                    <td class="small">@r.FileName</td>
+                    <td class="text-end">@r.CardCount.ToString("N0")</td>
+                    <td class="text-end text-nowrap">
+                        @if (r.UndoneAt is not null)
+                        {
+                            <span class="small">undone @SqliteTime.Display(r.UndoneAt)</span>
+                        }
+                        else if (_confirmUndo == r.Id)
+                        {
+                            <span class="small me-2">Delete these @r.CardCount cards?</span>
+                            <button class="btn btn-danger btn-sm" @onclick="() => UndoAsync(r)">Yes, undo import</button>
+                            <button class="btn btn-link btn-sm" @onclick="() => _confirmUndo = null">Cancel</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-outline-danger btn-sm" @onclick="() => _confirmUndo = r.Id">Undo</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<Toast @ref="_toast" />
+
+@code {
+    private const int PreviewLimit = 200;
+    private const long MaxFileSize = 20 * 1024 * 1024;
+
+    private ImportPreview? _preview;
+    private ImportRecord? _previousImport;
+    private ImportRecord? _done;
+    private IReadOnlyList<ImportRecord> _imports = [];
+    private bool _useOriginalDates;
+    private bool _busy;
+    private string _busyText = "";
+    private string? _fileError;
+    private long? _confirmUndo;
+    private int _inputKey;
+    private Toast? _toast;
+
+    protected override async Task OnInitializedAsync() => _imports = await Collection.GetImportsAsync();
+
+    private async Task OnFileSelectedAsync(InputFileChangeEventArgs e)
+    {
+        _fileError = null;
+        _preview = null;
+        _done = null;
+        if (e.File.Size > MaxFileSize)
+        {
+            _fileError = "That file is larger than 20 MB – is it really a collection export?";
+            return;
+        }
+
+        _busy = true;
+        _busyText = "Reading file and matching cards…";
+        StateHasChanged();
+        try
+        {
+            using var buffer = new MemoryStream();
+            await e.File.OpenReadStream(MaxFileSize).CopyToAsync(buffer);
+            var bytes = buffer.ToArray();
+            var name = e.File.Name;
+
+            // Matching builds the card index on first use – keep it off the UI thread.
+            _preview = await Task.Run(() => Importer.Parse(name, bytes));
+            _previousImport = _imports.FirstOrDefault(i => i.FileHash == _preview.FileHash && i.UndoneAt is null);
+        }
+        catch (Exception ex)
+        {
+            _fileError = $"Couldn't read the file: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+            _inputKey++;
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_preview is null) return;
+        _busy = true;
+        _busyText = $"Importing {_preview.MatchedCards:N0} cards…";
+        StateHasChanged();
+        try
+        {
+            _done = await Collection.ImportAsync("Archidekt", _preview, _useOriginalDates);
+            _preview = null;
+            _imports = await Collection.GetImportsAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UndoAsync(ImportRecord record)
+    {
+        var deleted = await Collection.UndoImportAsync(record.Id);
+        _confirmUndo = null;
+        _imports = await Collection.GetImportsAsync();
+        _toast?.Show($"Import undone – {deleted:N0} cards removed.", "secondary");
+    }
+}

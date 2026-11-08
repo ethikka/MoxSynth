@@ -125,6 +125,8 @@ public sealed class CollectionQuery
     public string? Name { get; set; }
     public string? SetCode { get; set; }
     public string? Finish { get; set; }
+    /// <summary>Optional Scryfall-syntax filter (same syntax as on the Search page).</summary>
+    public string? Scryfall { get; set; }
     /// <summary>When set, shows the collection as it was at this UTC moment.</summary>
     public DateTime? AsOf { get; set; }
     public int Page { get; set; } = 1;
@@ -132,6 +134,21 @@ public sealed class CollectionQuery
 }
 
 public sealed record CollectionPage(PagedResult<CollectionGroup> Groups, long TotalCopies);
+
+/// <summary>A file import into the collection (see <see cref="ArchidektImporter"/>).</summary>
+public sealed class ImportRecord
+{
+    private DateTime _importedAt;
+    private DateTime? _undoneAt;
+
+    public long Id { get; set; }
+    public string Source { get; set; } = "";
+    public string FileName { get; set; } = "";
+    public string FileHash { get; set; } = "";
+    public long CardCount { get; set; }
+    public DateTime ImportedAt { get => _importedAt; set => _importedAt = SqliteTime.AsUtc(value); }
+    public DateTime? UndoneAt { get => _undoneAt; set => _undoneAt = SqliteTime.AsUtc(value); }
+}
 
 public sealed class CollectionStats
 {
