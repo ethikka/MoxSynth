@@ -36,13 +36,35 @@ public static class CollectionSchema
         CREATE INDEX ix_collection_cards_added_at ON collection_cards (added_at);
         CREATE INDEX ix_collection_cards_removed_at ON collection_cards (removed_at);
         """,
+
+        // v2 – imports (e.g. from Archidekt): each imported card remembers its import, so an import can be undone
+        """
+        CREATE TABLE imports (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            source       TEXT    NOT NULL,
+            file_name    TEXT    NOT NULL,
+            file_hash    TEXT    NOT NULL,
+            imported_at  TEXT    NOT NULL,
+            card_count   INTEGER NOT NULL,
+            undone_at    TEXT    NULL
+        );
+
+        ALTER TABLE collection_cards ADD COLUMN import_id INTEGER NULL REFERENCES imports (id);
+        CREATE INDEX ix_collection_cards_import_id ON collection_cards (import_id);
+        """,
     ];
 
-    public static void Migrate(DatabasePaths paths, ILogger logger)
+    /// <summary>Creates the collection database at <paramref name="path"/> if needed and upgrades it to the latest schema.</summary>
+    public static void Migrate(string path, ILogger logger)
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(paths.CollectionPath)!);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
-        using var conn = new SqliteConnection(paths.CollectionConnectionString);
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = path,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+        }.ToString();
+        using var conn = new SqliteConnection(connectionString);
         conn.Open();
         conn.Execute("PRAGMA journal_mode = WAL;");
 
@@ -53,7 +75,7 @@ public static class CollectionSchema
             conn.Execute(Migrations[i], transaction: tx);
             conn.Execute($"PRAGMA user_version = {i + 1};", transaction: tx);
             tx.Commit();
-            logger.LogInformation("Collection database migrated to schema v{Version}.", i + 1);
+            logger.LogInformation("Collection database {Path} migrated to schema v{Version}.", path, i + 1);
         }
     }
 }

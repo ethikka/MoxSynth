@@ -1,0 +1,9 @@
+@* Shows the message for a ProfileErrors code (only known codes are shown, never raw URL text). *@
+@if (ProfileErrors.Message(Code) is { } message)
+{
+    <div class="text-danger small mt-2" role="alert">@message</div>
+}
+
+@code {
+    [Parameter] public string? Code { get; set; }
+}

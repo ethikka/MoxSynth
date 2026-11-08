@@ -1,0 +1,15 @@
+<div class="d-flex flex-wrap gap-2" role="radiogroup" aria-label="Colour">
+    @foreach (var color in ProfileColors.All)
+    {
+        var c = color;
+        <button type="button" class="color-swatch @(c == Value ? "selected" : "")" style="background:@c"
+                role="radio" aria-checked="@(c == Value ? "true" : "false")" title="@c" @onclick="() => SetAsync(c)"></button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Value { get; set; } = ProfileColors.All[0];
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    private Task SetAsync(string color) => ValueChanged.InvokeAsync(color);
+}

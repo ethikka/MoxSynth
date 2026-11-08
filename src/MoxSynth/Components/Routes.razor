@@ -1,6 +1,27 @@
-<Router AppAssembly="typeof(Program).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+@inject CurrentProfile Current
+@inject ProfileStore Profiles
+
+@if (Current.IsSelected)
+{
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <FocusOnNavigate RouteData="routeData" Selector="h1" />
+        </Found>
+    </Router>
+}
+else
+{
+    <ProfilePicker />
+}
+
+@code {
+    /// <summary>Profile id from the cookie (read by App.razor).</summary>
+    [Parameter] public long? ProfileId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Runs before any page, so every component in this circuit sees the right profile (and database).
+        Current.Set(ProfileId is { } id ? Profiles.Get(id) : null);
+    }
+}

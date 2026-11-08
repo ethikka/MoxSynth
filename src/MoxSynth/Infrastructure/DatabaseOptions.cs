@@ -12,22 +12,30 @@ public sealed class DatabaseOptions
     /// <summary>Optional zip that is extracted to <see cref="AllPrintings"/> when the sqlite file is missing.</summary>
     public string? AllPrintingsZip { get; set; } = "App_Data/AllPrintings.sqlite.zip";
 
-    /// <summary>Path to the user's collection database (created automatically).</summary>
+    /// <summary>Profiles database (who uses MoxSynth).</summary>
+    public string Profiles { get; set; } = "App_Data/profiles.db";
+
+    /// <summary>Folder holding one collection database per profile.</summary>
+    public string CollectionsFolder { get; set; } = "App_Data/collections";
+
+    /// <summary>
+    /// Single-user collection database from before profiles existed. If present on first start it becomes the
+    /// collection of the first (admin) profile.
+    /// </summary>
     public string Collection { get; set; } = "App_Data/collection.db";
 }
 
-public sealed record DatabasePaths(string AllPrintingsPath, string? AllPrintingsZipPath, string CollectionPath)
+public sealed record DatabasePaths(
+    string AllPrintingsPath,
+    string? AllPrintingsZipPath,
+    string ProfilesPath,
+    string CollectionsFolder,
+    string LegacyCollectionPath)
 {
     public string AllPrintingsConnectionString => new SqliteConnectionStringBuilder
     {
         DataSource = AllPrintingsPath,
         Mode = SqliteOpenMode.ReadOnly,
-    }.ToString();
-
-    public string CollectionConnectionString => new SqliteConnectionStringBuilder
-    {
-        DataSource = CollectionPath,
-        Mode = SqliteOpenMode.ReadWriteCreate,
     }.ToString();
 
     public static DatabasePaths Resolve(DatabaseOptions options, string contentRoot)
@@ -38,6 +46,8 @@ public sealed record DatabasePaths(string AllPrintingsPath, string? AllPrintings
         return new DatabasePaths(
             Full(options.AllPrintings, contentRoot),
             string.IsNullOrWhiteSpace(options.AllPrintingsZip) ? null : Full(options.AllPrintingsZip, contentRoot),
+            Full(options.Profiles, contentRoot),
+            Full(options.CollectionsFolder, contentRoot),
             Full(options.Collection, contentRoot));
     }
 }

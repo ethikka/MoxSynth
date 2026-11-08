@@ -19,8 +19,18 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes @rendermode="InteractiveServer" ProfileId="@ProfileId" />
     <script src="_framework/blazor.web.js"></script>
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+
+    [Inject] private MoxSynth.Profiles.ProfileStore Profiles { get; set; } = default!;
+
+    // The sign-in cookie can only be read here (static render with HttpContext); the profile id is passed on to
+    // the interactive Routes component, which stores it in the circuit's CurrentProfile.
+    private long? ProfileId => MoxSynth.Profiles.ProfileEndpoints.GetSignedInProfile(HttpContext, Profiles)?.Id;
+}

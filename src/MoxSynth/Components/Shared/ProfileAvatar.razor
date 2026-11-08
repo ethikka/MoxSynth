@@ -1,0 +1,9 @@
+<span class="profile-avatar" title="@Profile?.Name"
+      style="background:@(Profile?.Color ?? "#868e96");width:@(Size)px;height:@(Size)px;font-size:@(Size * 0.45)px">
+    @(Profile?.Initial ?? "?")
+</span>
+
+@code {
+    [Parameter] public Profile? Profile { get; set; }
+    [Parameter] public int Size { get; set; } = 32;
+}

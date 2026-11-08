@@ -1,0 +1,248 @@
+@page "/profiles"
+@inject ProfileStore Store
+@inject CurrentProfile Current
+
+<PageTitle>Profiles · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Profiles</h1>
+
+@if (!Current.IsAdmin)
+{
+    <div class="alert alert-secondary">Only an admin can manage profiles.</div>
+}
+else
+{
+    <p class="text-body-secondary small">
+        Every profile has its own collection and password. Admins can add, rename and remove profiles and set a new
+        password for someone who forgot theirs (that signs them out everywhere).
+        Removing a profile moves its collection database to <code>App_Data/collections/deleted</code>, so it can be recovered.
+    </p>
+
+    @if (_error is not null)
+    {
+        <div class="alert alert-danger py-2">@_error</div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header"><strong>Add a profile</strong></div>
+        <div class="card-body">
+            <form class="row g-3 align-items-end" @onsubmit="Add">
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Name</label>
+                    <input class="form-control" @bind="_newName" @bind:event="oninput" placeholder="Name" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Password</label>
+                    <input class="form-control" type="password" autocomplete="new-password" @bind="_newPassword" @bind:event="oninput" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-0">Repeat password</label>
+                    <input class="form-control" type="password" autocomplete="new-password" @bind="_newConfirm" @bind:event="oninput" />
+                </div>
+                <div class="col-md-3 small text-body-secondary">At least @PasswordHashing.MinimumLength characters. Tell the person their password; they can change it under “Change password”.</div>
+                <div class="col-md-6">
+                    <label class="form-label small mb-1 d-block">Colour</label>
+                    <ColorChooser @bind-Value="_newColor" />
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="newAdmin" @bind="_newAdmin" />
+                        <label class="form-check-label small" for="newAdmin">Admin</label>
+                    </div>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button type="submit" class="btn btn-primary" disabled="@string.IsNullOrWhiteSpace(_newName)">Add profile</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <table class="table align-middle">
+        <thead>
+            <tr><th></th><th>Name</th><th>Role</th><th class="text-end">Cards owned</th><th>Created</th><th></th></tr>
+        </thead>
+        <tbody>
+            @foreach (var p in _profiles)
+            {
+                var profile = p;
+                var isMe = profile.Id == Current.Value?.Id;
+                @if (_editId == profile.Id)
+                {
+                    <tr class="table-active">
+                        <td><ProfileAvatar Profile="@(new Profile { Name = _editName, Color = _editColor })" /></td>
+                        <td colspan="3">
+                            <input class="form-control form-control-sm mb-2" @bind="_editName" @bind:event="oninput" />
+                            <ColorChooser @bind-Value="_editColor" />
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="editAdmin" @bind="_editAdmin" />
+                                <label class="form-check-label small" for="editAdmin">Admin</label>
+                            </div>
+                            @if (!isMe)
+                            {
+                                <div class="row g-2 mt-1">
+                                    <div class="col-sm-6">
+                                        <input class="form-control form-control-sm" type="password" autocomplete="new-password"
+                                               placeholder="New password (leave empty to keep)" @bind="_editPassword" @bind:event="oninput" />
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <input class="form-control form-control-sm" type="password" autocomplete="new-password"
+                                               placeholder="Repeat new password" @bind="_editConfirm" @bind:event="oninput" />
+                                    </div>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="small text-body-secondary mt-2">Change your own password under <a href="account">Change password</a>.</div>
+                            }
+                        </td>
+                        <td></td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-primary btn-sm" @onclick="SaveEdit">Save</button>
+                            <button class="btn btn-link btn-sm" @onclick="() => _editId = null">Cancel</button>
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    <tr>
+                        <td><ProfileAvatar Profile="profile" /></td>
+                        <td>
+                            @profile.Name
+                            @if (isMe)
+                            {
+                                <span class="badge text-bg-info gap-start-1">you</span>
+                            }
+                        </td>
+                        <td>
+                            @(profile.IsAdmin ? "Admin" : "Collector")
+                            @if (!profile.HasPassword)
+                            {
+                                <span class="badge text-bg-warning gap-start-1" title="Will be asked to set a password when picked">no password yet</span>
+                            }
+                        </td>
+                        <td class="text-end">@_owned.GetValueOrDefault(profile.Id).ToString("N0")</td>
+                        <td class="small text-body-secondary">@SqliteTime.Display(profile.CreatedAt)</td>
+                        <td class="text-end text-nowrap">
+                            @if (_deleteId == profile.Id)
+                            {
+                                <span class="small me-2">Remove @profile.Name?</span>
+                                <button class="btn btn-danger btn-sm" @onclick="() => Delete(profile)">Yes, remove</button>
+                                <button class="btn btn-link btn-sm" @onclick="() => _deleteId = null">Cancel</button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-outline-secondary btn-sm" @onclick="() => StartEdit(profile)">Edit</button>
+                                @if (!isMe)
+                                {
+                                    <button class="btn btn-outline-danger btn-sm gap-start-1" @onclick="() => _deleteId = profile.Id">Remove</button>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+}
+
+<Toast @ref="_toast" />
+
+@code {
+    private IReadOnlyList<Profile> _profiles = [];
+    private Dictionary<long, long> _owned = new();
+    private string? _error;
+    private Toast? _toast;
+
+    private string _newName = "";
+    private string _newColor = ProfileColors.All[1];
+    private bool _newAdmin;
+    private string _newPassword = "";
+    private string _newConfirm = "";
+
+    private long? _editId;
+    private string _editName = "";
+    private string _editColor = "";
+    private bool _editAdmin;
+    private string _editPassword = "";
+    private string _editConfirm = "";
+
+    private long? _deleteId;
+
+    protected override void OnInitialized() => Load();
+
+    private void Load()
+    {
+        _profiles = Store.GetAll();
+        _owned = _profiles.ToDictionary(p => p.Id, Store.CountOwnedCards);
+    }
+
+    private void Add()
+    {
+        _error = null;
+        try
+        {
+            var profile = Store.Create(_newName, _newColor, _newAdmin, _newPassword, _newConfirm);
+            _toast?.Show($"Profile {profile.Name} added.");
+            _newName = "";
+            _newAdmin = false;
+            _newPassword = _newConfirm = "";
+            _newColor = ProfileColors.All[(Array.IndexOf(ProfileColors.All.ToArray(), _newColor) + 1) % ProfileColors.All.Count];
+            Load();
+        }
+        catch (ProfileException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void StartEdit(Profile profile)
+    {
+        _error = null;
+        _deleteId = null;
+        _editId = profile.Id;
+        _editName = profile.Name;
+        _editColor = profile.Color;
+        _editAdmin = profile.IsAdmin;
+        _editPassword = _editConfirm = "";
+    }
+
+    private void SaveEdit()
+    {
+        if (_editId is not { } id) return;
+        _error = null;
+        try
+        {
+            var resetPassword = id != Current.Value?.Id && (_editPassword.Length > 0 || _editConfirm.Length > 0);
+            if (resetPassword) ProfileStore.ValidatePassword(_editPassword, _editConfirm); // before saving anything
+            Store.Update(id, _editName, _editColor, _editAdmin);
+            if (resetPassword)
+            {
+                Store.SetPassword(id, _editPassword, _editConfirm);
+                _toast?.Show($"New password set for {_editName}.");
+            }
+            if (id == Current.Value?.Id) Current.Set(Store.Get(id)); // keep the navbar in sync
+            _editId = null;
+            Load();
+        }
+        catch (ProfileException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private void Delete(Profile profile)
+    {
+        _error = null;
+        try
+        {
+            Store.Delete(profile.Id);
+            _deleteId = null;
+            _toast?.Show($"Profile {profile.Name} removed.", "secondary");
+            Load();
+        }
+        catch (ProfileException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}
