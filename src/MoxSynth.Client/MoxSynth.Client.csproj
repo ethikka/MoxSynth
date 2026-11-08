@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    UI-independent part of the mobile app: API client, session handling and view models (CommunityToolkit.Mvvm).
+    Plain net10.0 so it can be built and tested without the Android SDK; MoxSynth.Mobile only adds pages and
+    platform services (secure storage, camera + OCR, navigation).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MoxSynth.Contracts\MoxSynth.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

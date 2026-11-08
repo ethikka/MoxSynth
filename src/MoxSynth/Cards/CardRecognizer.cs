@@ -13,6 +13,9 @@ public sealed record CardRecognition(string Name, string? SetCode, string? Numbe
     public bool IsExactPrinting => SetCode is not null && Number is not null;
 }
 
+/// <summary>An OCR'd line of a photo with its bounding box (pixels).</summary>
+public sealed record OcrTextLine(string Text, double X, double Y, double Width, double Height);
+
 /// <summary>
 /// Turns OCR text from a card photo into a card: fuzzy-matches the title line against all card (face) names
 /// and parses collector number + set code from the bottom-left info line ("0123/280 R" / "MH2 • EN").
@@ -83,6 +86,81 @@ public sealed partial class CardRecognizer(DatabasePaths paths)
             return new CardRecognition(name, setCode, null, nameScore);
 
         return new CardRecognition(name, null, null, nameScore);
+    }
+
+    // ------------------------------------------------------------------ whole photo (mobile app)
+
+    /// <summary>
+    /// Recognises a card from the OCR lines of a whole photo (the Android app uses on-device OCR of the full image).
+    /// The title is searched among the top lines of the text area – also with trailing words dropped, since the
+    /// mana cost is often read as junk at the end of the title line – and the info line among the bottom-left lines
+    /// (left part only, so the copyright year on the right isn't taken for a collector number).
+    /// Falls back to any line that matches a card name very well.
+    /// </summary>
+    public (CardRecognition? Result, string TitleText, string BottomText) RecognizeLines(IReadOnlyList<OcrTextLine> lines)
+    {
+        var usable = lines.Where(l => !string.IsNullOrWhiteSpace(l.Text) && l.Height > 0).ToList();
+        if (usable.Count == 0 || !File.Exists(paths.AllPrintingsPath)) return (null, "", "");
+        EnsureLoaded();
+
+        var top = usable.Min(l => l.Y);
+        var bottom = usable.Max(l => l.Y + l.Height);
+        var left = usable.Min(l => l.X);
+        var right = usable.Max(l => l.X + l.Width);
+        var height = Math.Max(1, bottom - top);
+        var width = Math.Max(1, right - left);
+
+        // Title: best name match among the topmost lines.
+        var titleLines = usable.Where(l => l.Y - top <= height * 0.15).OrderBy(l => l.Y).Take(4).ToList();
+
+        string? titleText = null;
+        var bestScore = 0.0;
+        foreach (var line in titleLines)
+        {
+            foreach (var candidate in WordPrefixes(line.Text))
+            {
+                var (name, score) = MatchTitle(candidate);
+                if (name is not null && score > bestScore)
+                {
+                    bestScore = score;
+                    titleText = candidate;
+                }
+            }
+        }
+
+        // Fallback: card photographed with other text around it – any line that is almost exactly a card name.
+        if (titleText is null)
+        {
+            foreach (var line in usable.OrderBy(l => l.Y).Take(40))
+            {
+                foreach (var candidate in WordPrefixes(line.Text))
+                {
+                    var (name, score) = MatchTitle(candidate);
+                    if (name is not null && score >= 0.9 && score > bestScore)
+                    {
+                        bestScore = score;
+                        titleText = candidate;
+                    }
+                }
+            }
+        }
+
+        // Info line(s): bottom 18 % of the text area, left 65 %.
+        var bottomText = string.Join('\n', usable
+            .Where(l => l.Y + l.Height >= bottom - height * 0.18 && l.X - left <= width * 0.65)
+            .OrderBy(l => l.Y).ThenBy(l => l.X)
+            .Select(l => l.Text));
+
+        var title = titleText ?? titleLines.FirstOrDefault()?.Text ?? "";
+        return (Recognize(title, bottomText), title, bottomText);
+    }
+
+    /// <summary>"Lightning Bolt 3R x" → "Lightning Bolt 3R x", "Lightning Bolt 3R", "Lightning Bolt", "Lightning".</summary>
+    private static IEnumerable<string> WordPrefixes(string text)
+    {
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (var n = words.Length; n >= 1 && n >= words.Length - 4; n--)
+            yield return string.Join(' ', words, 0, n);
     }
 
     // ------------------------------------------------------------------ bottom line

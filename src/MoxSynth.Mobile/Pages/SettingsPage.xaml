@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     x:Class="MoxSynth.Mobile.Pages.SettingsPage"
+                     x:DataType="vm:SettingsViewModel"
+                     Title="Settings">
+    <ScrollView>
+        <VerticalStackLayout Padding="12" Spacing="10">
+            <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="4">
+                    <Label Text="Prices from" FontAttributes="Bold" />
+                    <Label Text="Shop used for prices, trends and the collection value." Style="{StaticResource Muted}" />
+                    <Picker ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                    <Label Text="Signed in as" Style="{StaticResource Muted}" />
+                    <Label Grid.Column="1" Text="{Binding ProfileName}" FontAttributes="Bold" />
+                    <Label Grid.Row="1" Text="Server" Style="{StaticResource Muted}" />
+                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding ServerUrl}" />
+                    <Label Grid.Row="2" Text="Card database" Style="{StaticResource Muted}" />
+                    <Label Grid.Row="2" Grid.Column="1" Text="{Binding CardDatabase}" />
+                    <Label Grid.Row="3" Text="Prices updated" Style="{StaticResource Muted}" />
+                    <Label Grid.Row="3" Grid.Column="1" Text="{Binding PricesDate}" />
+                </Grid>
+            </Border>
+
+            <Button Text="Sign out" Command="{Binding SignOutCommand}" BackgroundColor="{StaticResource Danger}" TextColor="White" />
+            <Label Text="Profiles, passwords, imports and price updates are managed in the web app."
+                   Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+        </VerticalStackLayout>
+    </ScrollView>
+</pages:ViewModelPage>

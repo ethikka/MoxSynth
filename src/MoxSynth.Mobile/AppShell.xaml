@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+       xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+       xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+       x:Class="MoxSynth.Mobile.AppShell"
+       FlyoutBehavior="Disabled">
+
+    <!-- Decides between sign-in and the tabs (stored session). -->
+    <ShellContent Route="start" ContentTemplate="{DataTemplate pages:StartPage}" Shell.NavBarIsVisible="False" />
+
+    <ShellContent Route="login" ContentTemplate="{DataTemplate pages:LoginPage}" Shell.NavBarIsVisible="False" />
+
+    <TabBar Route="main">
+        <ShellContent Route="home" Title="Home" Icon="tab_home.png" ContentTemplate="{DataTemplate pages:HomePage}" />
+        <ShellContent Route="search" Title="Search" Icon="tab_search.png" ContentTemplate="{DataTemplate pages:SearchPage}" />
+        <ShellContent Route="collection" Title="Collection" Icon="tab_collection.png" ContentTemplate="{DataTemplate pages:CollectionPage}" />
+        <ShellContent Route="history" Title="History" Icon="tab_history.png" ContentTemplate="{DataTemplate pages:HistoryPage}" />
+    </TabBar>
+</Shell>

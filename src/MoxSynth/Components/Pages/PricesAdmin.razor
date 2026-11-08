@@ -1,0 +1,143 @@
+@page "/prices"
+@implements IDisposable
+@inject PriceUpdateService Updater
+@inject CurrentProfile Current
+@inject Microsoft.Extensions.Options.IOptions<PriceOptions> Options
+
+<PageTitle>Prices · MoxSynth</PageTitle>
+
+<h1 class="h3 mb-3">Prices</h1>
+
+@if (!Current.IsAdmin)
+{
+    <div class="alert alert-secondary">Only an admin can update prices.</div>
+}
+else
+{
+    var status = Updater.Status;
+    <p class="text-body-secondary small">
+        Prices come from <a href="https://mtgjson.com/downloads/all-files/#allprices" target="_blank" rel="noopener">MTGJSON AllPrices</a>
+        (daily retail prices of the last ~90 days) and are stored in their own database
+        (<code>App_Data/prices.db</code>), separate from the card catalogue and the collections.
+        Providers imported: @string.Join(", ", Options.Value.EffectiveProviders.Select(PriceProviders.Label)) (set in <code>appsettings.json</code>).
+    </p>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="small text-body-secondary">Prices of</div>
+                    <div class="fs-5">@(status.SourceDate ?? "–")</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="small text-body-secondary">Imported</div>
+                    <div class="fs-5">@(status.LastImportUtc is { } at ? SqliteTime.Display(at) : "never")</div>
+                </div>
+                <div class="col-md-4">
+                    <div class="small text-body-secondary">Prices stored</div>
+                    <div class="fs-5">@status.Rows.ToString("N0")</div>
+                </div>
+            </div>
+
+            @if (status.Running)
+            {
+                <div class="alert alert-info mt-3 mb-0 d-flex align-items-center gap-2">
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span>@status.Message @(status.CardsProcessed > 0 ? $"({status.CardsProcessed:N0} cards)" : "")</span>
+                </div>
+            }
+            else if (status.Error is not null)
+            {
+                <div class="alert alert-danger mt-3 mb-0">@status.Message @status.Error</div>
+            }
+            else if (!string.IsNullOrEmpty(status.Message))
+            {
+                <div class="alert alert-success mt-3 mb-0">@status.Message</div>
+            }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><strong>Update prices</strong></div>
+        <div class="card-body d-flex flex-column gap-3">
+            <div>
+                <button class="btn btn-primary" disabled="@status.Running" @onclick="Download">Download latest from MTGJSON &amp; import</button>
+                <div class="form-text">Downloads <code>@Options.Value.DownloadUrl</code> (~150 MB) to App_Data and imports it (takes a minute or two).</div>
+            </div>
+            <div>
+                <button class="btn btn-outline-primary" disabled="@(status.Running || !Updater.ZipAvailable)" @onclick="ImportExisting">Import App_Data/AllPrices.json.zip</button>
+                <div class="form-text">
+                    @if (Updater.ZipAvailable)
+                    {
+                        <span>File from @SqliteTime.Display(Updater.ZipModifiedUtc). A newer file placed there is also imported automatically when the app starts.</span>
+                    }
+                    else
+                    {
+                        <span>No file at <code>@Updater.ZipPath</code> yet.</span>
+                    }
+                </div>
+            </div>
+            <div>
+                <label class="form-label small mb-1">Or upload an AllPrices.json.zip</label>
+                <InputFile @key="_inputKey" OnChange="UploadAsync" accept=".zip" class="form-control" disabled="@(status.Running || _uploading)" />
+                @if (_uploading)
+                {
+                    <div class="small text-body-secondary mt-1"><span class="spinner-border spinner-border-sm me-1"></span>Uploading…</div>
+                }
+                @if (_uploadError is not null)
+                {
+                    <div class="text-danger small mt-1">@_uploadError</div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private const long MaxUpload = 500L * 1024 * 1024;
+    private bool _uploading;
+    private string? _uploadError;
+    private int _inputKey;
+
+    protected override void OnInitialized() => Updater.StatusChanged += OnStatusChanged;
+
+    private DateTime _lastRender = DateTime.MinValue;
+
+    private void OnStatusChanged()
+    {
+        // Progress events can be frequent; refresh at most twice a second (always on finish).
+        if (Updater.Status.Running && DateTime.UtcNow - _lastRender < TimeSpan.FromMilliseconds(500)) return;
+        _lastRender = DateTime.UtcNow;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Download() => Updater.RequestDownload();
+
+    private void ImportExisting() => Updater.RequestImport();
+
+    private async Task UploadAsync(InputFileChangeEventArgs e)
+    {
+        _uploadError = null;
+        if (!e.File.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            _uploadError = "Please choose AllPrices.json.zip.";
+            return;
+        }
+        _uploading = true;
+        try
+        {
+            await Updater.SaveUploadAsync(e.File.OpenReadStream(MaxUpload), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _uploadError = $"Upload failed: {ex.Message}";
+        }
+        finally
+        {
+            _uploading = false;
+            _inputKey++;
+        }
+    }
+
+    public void Dispose() => Updater.StatusChanged -= OnStatusChanged;
+}

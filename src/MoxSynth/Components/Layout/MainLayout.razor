@@ -2,7 +2,7 @@
 @inject CardRepository Cards
 
 <nav class="navbar navbar-expand navbar-dark bg-dark mb-3">
-    <div class="container-fluid">
+    <div class="container-fluid flex-wrap gap-2">
         <a class="navbar-brand" href="">MoxSynth</a>
         <ul class="navbar-nav me-auto">
             <li class="nav-item"><NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink></li>
@@ -12,6 +12,7 @@
             <li class="nav-item"><NavLink class="nav-link" href="import">Import</NavLink></li>
         </ul>
         <div class="d-flex align-items-center gap-2">
+            <PriceProviderSelector />
             <ProfileMenu />
             <ThemeSelector />
         </div>

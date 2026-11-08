@@ -12,6 +12,12 @@ public sealed class DatabaseOptions
     /// <summary>Optional zip that is extracted to <see cref="AllPrintings"/> when the sqlite file is missing.</summary>
     public string? AllPrintingsZip { get; set; } = "App_Data/AllPrintings.sqlite.zip";
 
+    /// <summary>Price database built from MTGJSON AllPrices (replaced as a whole on every update).</summary>
+    public string Prices { get; set; } = "App_Data/prices.db";
+
+    /// <summary>MTGJSON AllPrices.json.zip used to (re)build <see cref="Prices"/>.</summary>
+    public string AllPricesZip { get; set; } = "App_Data/AllPrices.json.zip";
+
     /// <summary>Profiles database (who uses MoxSynth).</summary>
     public string Profiles { get; set; } = "App_Data/profiles.db";
 
@@ -30,7 +36,9 @@ public sealed record DatabasePaths(
     string? AllPrintingsZipPath,
     string ProfilesPath,
     string CollectionsFolder,
-    string LegacyCollectionPath)
+    string LegacyCollectionPath,
+    string PricesPath,
+    string AllPricesZipPath)
 {
     public string AllPrintingsConnectionString => new SqliteConnectionStringBuilder
     {
@@ -48,6 +56,8 @@ public sealed record DatabasePaths(
             string.IsNullOrWhiteSpace(options.AllPrintingsZip) ? null : Full(options.AllPrintingsZip, contentRoot),
             Full(options.Profiles, contentRoot),
             Full(options.CollectionsFolder, contentRoot),
-            Full(options.Collection, contentRoot));
+            Full(options.Collection, contentRoot),
+            Full(options.Prices, contentRoot),
+            Full(options.AllPricesZip, contentRoot));
     }
 }

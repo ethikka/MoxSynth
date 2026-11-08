@@ -189,11 +189,24 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
             p.AddDynamicParams(scryfall.Parameters);
         }
 
-        // order:… from the Scryfall query sorts by catalogue data (aliases c / s), otherwise by name.
+        // Prices (separate prices.db, attached as "pr"): price of the owned finish at the chosen provider.
+        var usePrices = query.PriceProvider is not null && File.Exists(paths.PricesPath);
+        const string priceJoin = "LEFT JOIN pr.prices px ON px.uuid = cc.card_uuid AND px.provider = @priceProvider AND px.finish = cc.finish";
+        if (usePrices) p.Add("priceProvider", query.PriceProvider);
+
+        // Sorting: explicit price sort → order:… from the Scryfall query (catalogue data, aliases c / s) → name.
         var join = scryfall.OrderBy is null ? "" : "LEFT JOIN mtg.cards c ON c.uuid = cc.card_uuid LEFT JOIN mtg.sets s ON s.code = c.setCode";
-        var orderBy = scryfall.OrderBy is null
-            ? "MAX(cc.name) COLLATE NOCASE, MAX(cc.set_code), MAX(cc.number), cc.finish, cc.condition"
-            : $"{scryfall.OrderBy}, MAX(cc.name) COLLATE NOCASE, cc.finish, cc.condition";
+        if (usePrices) join += " " + priceJoin;
+        const string byName = "MAX(cc.name) COLLATE NOCASE, MAX(cc.set_code), MAX(cc.number), cc.finish, cc.condition";
+        var orderBy = (usePrices ? query.Sort : CollectionSort.Name) switch
+        {
+            CollectionSort.ValueDesc => $"COUNT(*) * MAX(px.price) IS NULL, COUNT(*) * MAX(px.price) DESC, {byName}",
+            CollectionSort.PriceDesc => $"MAX(px.price) IS NULL, MAX(px.price) DESC, {byName}",
+            CollectionSort.RisingDesc => $"MAX(px.price_7d) IS NULL, (MAX(px.price) - MAX(px.price_7d)) / MAX(px.price_7d) DESC, {byName}",
+            CollectionSort.FallingDesc => $"MAX(px.price_7d) IS NULL, (MAX(px.price) - MAX(px.price_7d)) / MAX(px.price_7d) ASC, {byName}",
+            _ when scryfall.OrderBy is not null => $"{scryfall.OrderBy}, MAX(cc.name) COLLATE NOCASE, cc.finish, cc.condition",
+            _ => byName,
+        };
 
         var whereSql = string.Join(" AND ", where);
         const string groupBy = "GROUP BY cc.card_uuid, cc.finish, cc.condition, cc.language";
@@ -202,13 +215,26 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
 
         await using var conn = Open();
         await conn.OpenAsync(ct);
-        if (useCatalogue) await AttachCatalogueAsync(conn, ct);
+        if (useCatalogue) await AttachAsync(conn, "mtg", paths.AllPrintingsPath, ct);
+        if (usePrices) await AttachAsync(conn, "pr", paths.PricesPath, ct);
         try
         {
             var totals = await conn.QuerySingleAsync<(long Groups, long Copies)>(new CommandDefinition($"""
                 SELECT COUNT(*), COALESCE(SUM(qty), 0)
                 FROM (SELECT COUNT(*) AS qty FROM collection_cards cc WHERE {whereSql} {groupBy})
                 """, p, cancellationToken: ct));
+
+            // Estimated value of everything matching the filters (not just this page).
+            (double? Value, string? Currency, long Unpriced) value = (null, null, 0);
+            if (usePrices)
+            {
+                value = await conn.QuerySingleAsync<(double?, string?, long)>(new CommandDefinition($"""
+                    SELECT SUM(px.price), MAX(px.currency), COALESCE(SUM(px.price IS NULL), 0)
+                    FROM collection_cards cc
+                    {priceJoin}
+                    WHERE {whereSql}
+                    """, p, cancellationToken: ct));
+            }
 
             var groups = await conn.QueryAsync<CollectionGroup>(new CommandDefinition($"""
                 SELECT cc.card_uuid, MAX(cc.name) AS name, MAX(cc.set_code) AS set_code, MAX(cc.number) AS number,
@@ -224,21 +250,31 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
 
             return new CollectionPage(
                 new PagedResult<CollectionGroup>(groups.AsList(), (int)totals.Groups, page, pageSize),
-                totals.Copies);
+                totals.Copies)
+            {
+                TotalValue = value.Value,
+                Currency = value.Currency,
+                UnpricedCopies = value.Unpriced,
+            };
         }
         finally
         {
             if (useCatalogue) await conn.ExecuteAsync("DETACH DATABASE mtg");
+            if (usePrices) await conn.ExecuteAsync("DETACH DATABASE pr");
         }
     }
 
-    /// <summary>Attaches AllPrintings as schema "mtg" (read-only use) to a collection connection.</summary>
-    private async Task AttachCatalogueAsync(SqliteConnection conn, CancellationToken ct)
+    /// <summary>Estimated value of the current collection at a price provider (dashboard).</summary>
+    public async Task<CollectionPage> GetValueAsync(string provider, CancellationToken ct = default) =>
+        await GetGroupsAsync(new CollectionQuery { PageSize = 1, PriceProvider = provider }, ct);
+
+    /// <summary>Attaches another database (catalogue "mtg", prices "pr") to a collection connection, read-only use.</summary>
+    private static async Task AttachAsync(SqliteConnection conn, string alias, string path, CancellationToken ct)
     {
         // Pooled connections may still have it attached if a previous query was interrupted.
         var attached = await conn.QueryAsync<string>(new CommandDefinition("SELECT name FROM pragma_database_list", cancellationToken: ct));
-        if (!attached.Contains("mtg"))
-            await conn.ExecuteAsync(new CommandDefinition("ATTACH DATABASE @path AS mtg", new { path = paths.AllPrintingsPath }, cancellationToken: ct));
+        if (!attached.Contains(alias))
+            await conn.ExecuteAsync(new CommandDefinition($"ATTACH DATABASE @path AS {alias}", new { path }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<string>> GetSetCodesAsync(CancellationToken ct = default)

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     x:Class="MoxSynth.Mobile.Pages.HomePage"
+                     x:DataType="vm:HomeViewModel"
+                     Title="MoxSynth">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Settings" IconImageSource="settings.png" Clicked="OnSettingsClicked" />
+    </ContentPage.ToolbarItems>
+
+    <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+        <ScrollView>
+            <VerticalStackLayout Padding="12" Spacing="10">
+                <Label Text="{Binding Greeting}" Style="{StaticResource Title}" />
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
+
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout>
+                        <Label Text="Collection value" Style="{StaticResource Muted}" />
+                        <Label Text="{Binding ValueText}" FontSize="30" FontAttributes="Bold" />
+                        <Label Text="{Binding ValueNote}" Style="{StaticResource Muted}" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                    <Border Style="{StaticResource Card}">
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Stats.OwnedCopies, StringFormat='{0:N0}'}" FontSize="22" FontAttributes="Bold" />
+                            <Label Text="cards" Style="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource Card}">
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Stats.UniqueNames, StringFormat='{0:N0}'}" FontSize="22" FontAttributes="Bold" />
+                            <Label Text="unique cards" Style="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <VerticalStackLayout>
+                            <Label Text="{Binding Stats.AddedLast30Days, StringFormat='+{0:N0}'}" FontSize="22" FontAttributes="Bold"
+                                   TextColor="{StaticResource TrendUp}" />
+                            <Label Text="added (30 days)" Style="{StaticResource Muted}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </Grid>
+
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                    <Button Text="Scan a card" Clicked="OnScanClicked" />
+                    <Button Grid.Column="1" Text="Search cards" Style="{StaticResource Secondary}"
+                            Command="{Binding GoToCommand}" CommandParameter="//main/search" />
+                </Grid>
+
+                <Label Text="Recent changes" Style="{StaticResource Heading}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Recent}" Spacing="2">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HistoryItem">
+                            <Grid ColumnDefinitions="24,*,Auto" Padding="4,6" ColumnSpacing="6">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnRecentTapped" />
+                                </Grid.GestureRecognizers>
+                                <Label Text="{Binding Symbol}" FontSize="18" FontAttributes="Bold" VerticalOptions="Center">
+                                    <Label.Triggers>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsAdded}" Value="True">
+                                            <Setter Property="TextColor" Value="{StaticResource TrendUp}" />
+                                        </DataTrigger>
+                                        <DataTrigger TargetType="Label" Binding="{Binding IsAdded}" Value="False">
+                                            <Setter Property="TextColor" Value="{StaticResource TrendDown}" />
+                                        </DataTrigger>
+                                    </Label.Triggers>
+                                </Label>
+                                <VerticalStackLayout Grid.Column="1">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="2" Text="{Binding When}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+</pages:ViewModelPage>
