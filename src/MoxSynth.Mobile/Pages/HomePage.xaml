@@ -41,7 +41,7 @@
                     <Border Grid.Column="2" Style="{StaticResource Card}">
                         <VerticalStackLayout>
                             <Label Text="{Binding Stats.AddedLast30Days, StringFormat='+{0:N0}'}" FontSize="22" FontAttributes="Bold"
-                                   TextColor="{StaticResource TrendUp}" />
+                                   TextColor="{DynamicResource ThemeOk}" />
                             <Label Text="added (30 days)" Style="{StaticResource Muted}" />
                         </VerticalStackLayout>
                     </Border>
@@ -64,10 +64,10 @@
                                 <Label Text="{Binding Symbol}" FontSize="18" FontAttributes="Bold" VerticalOptions="Center">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsAdded}" Value="True">
-                                            <Setter Property="TextColor" Value="{StaticResource TrendUp}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource ThemeOk}" />
                                         </DataTrigger>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsAdded}" Value="False">
-                                            <Setter Property="TextColor" Value="{StaticResource TrendDown}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource ThemeBad}" />
                                         </DataTrigger>
                                     </Label.Triggers>
                                 </Label>

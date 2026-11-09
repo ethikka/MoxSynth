@@ -4,15 +4,15 @@ using MoxSynth.Client.ViewModels;
 
 namespace MoxSynth.Mobile.Controls;
 
-/// <summary>Trend → green / red / grey (from the app resources).</summary>
+/// <summary>Trend → the theme's ok / bad / muted colour (read when bound; lists rebind on reload).</summary>
 public sealed class TrendColorConverter : IValueConverter
 {
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         Resource(value switch
         {
-            Trend.Up => "TrendUp",
-            Trend.Down => "TrendDown",
-            _ => "TrendFlat",
+            Trend.Up => "ThemeOk",
+            Trend.Down => "ThemeBad",
+            _ => "ThemeMuted",
         });
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>

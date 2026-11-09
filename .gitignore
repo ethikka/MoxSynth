@@ -14,3 +14,7 @@ obj/
 *.db
 *.db-shm
 *.db-wal
+
+# Docker data folder and settings (compose.yaml)
+data/
+.env

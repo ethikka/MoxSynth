@@ -13,7 +13,15 @@ public static class MauiProgram
         var builder = MauiApp.CreateBuilder();
         builder
             .UseMauiApp<App>()
-            .UseOcr();
+            .UseOcr()
+            .ConfigureFonts(fonts =>
+            {
+                // Heading fonts of the special themes (same as the web app; SIL Open Font License).
+                fonts.AddFont("Orbitron.ttf", "Orbitron");
+                fonts.AddFont("Creepster-Regular.ttf", "Creepster");
+                fonts.AddFont("Cinzel.ttf", "Cinzel");
+                fonts.AddFont("Rajdhani-SemiBold.ttf", "Rajdhani");
+            });
 
         var services = builder.Services;
 
@@ -24,6 +32,8 @@ public static class MauiProgram
         services.AddSingleton<INavigator, ShellNavigator>();
         services.AddSingleton<IDialogs, ShellDialogs>();
         services.AddSingleton<ICardScanner, MlKitCardScanner>();
+        services.AddSingleton<ThemeService>();
+        services.AddSingleton<IThemeService>(sp => sp.GetRequiredService<ThemeService>());
 
         // API + session (one per app)
         services.AddSingleton(sp => new MoxApiClient(sp.GetRequiredService<ITokenStore>()));

@@ -46,7 +46,7 @@
                                 <Label FormattedText="{Binding ManaCost, Converter={StaticResource ManaCost}}"
                                        IsVisible="{Binding ManaCost, Converter={StaticResource IsNotNull}}" />
                                 <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
-                                <Label Text="{Binding OwnedText}" FontSize="12" TextColor="{StaticResource TrendUp}"
+                                <Label Text="{Binding OwnedText}" FontSize="12" TextColor="{DynamicResource ThemeOk}"
                                        IsVisible="{Binding IsOwned}" />
                             </VerticalStackLayout>
                             <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="End"

@@ -103,7 +103,7 @@
                             <Border Style="{StaticResource Card}" Opacity="{Binding Price.IsStale, Converter={StaticResource Dimmed}}">
                                 <Border.Triggers>
                                     <DataTrigger TargetType="Border" Binding="{Binding IsSelectedProvider}" Value="True">
-                                        <Setter Property="Stroke" Value="{AppThemeBinding Light={StaticResource Primary}, Dark={StaticResource PrimaryDark}}" />
+                                        <Setter Property="Stroke" Value="{DynamicResource ThemeAccent}" />
                                     </DataTrigger>
                                 </Border.Triggers>
                                 <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
@@ -152,7 +152,7 @@
                                     <Label Text="{Binding SetName}" LineBreakMode="TailTruncation" />
                                     <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
                                 </VerticalStackLayout>
-                                <Label Grid.Column="1" Text="{Binding OwnedText}" FontSize="12" TextColor="{StaticResource TrendUp}"
+                                <Label Grid.Column="1" Text="{Binding OwnedText}" FontSize="12" TextColor="{DynamicResource ThemeOk}"
                                        VerticalOptions="Center" />
                             </Grid>
                         </DataTemplate>

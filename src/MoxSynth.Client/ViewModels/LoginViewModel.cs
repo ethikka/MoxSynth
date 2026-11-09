@@ -31,7 +31,7 @@ public sealed partial class LoginViewModel(MoxApiClient api, AppSession session,
 
     public override async Task OnAppearingAsync()
     {
-        if (string.IsNullOrEmpty(ServerUrl)) ServerUrl = settings.Get(AppSession.ServerUrlKey) ?? "";
+        if (string.IsNullOrEmpty(ServerUrl)) ServerUrl = settings.Get(AppSession.ServerUrlKey) ?? MoxApiClient.DefaultServer;
         if (!IsConnected && !string.IsNullOrEmpty(ServerUrl)) await ConnectAsync();
     }
 

@@ -16,9 +16,9 @@
                 <VerticalStackLayout Spacing="8">
                     <Label Text="Server" FontAttributes="Bold" />
                     <Label Style="{StaticResource Muted}"
-                           Text="Address of the computer running MoxSynth on your Wi-Fi, e.g. 192.168.1.20:5180" />
+                           Text="Address of the computer running MoxSynth on your Wi-Fi – moxsynth:5180 unless you changed it, or its IP address, e.g. 192.168.1.20:5180" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <Entry Text="{Binding ServerUrl}" Placeholder="192.168.1.20:5180" Keyboard="Url"
+                        <Entry Text="{Binding ServerUrl}" Placeholder="moxsynth:5180" Keyboard="Url"
                                ReturnCommand="{Binding ConnectCommand}" />
                         <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectCommand}" Style="{StaticResource Secondary}" />
                     </Grid>

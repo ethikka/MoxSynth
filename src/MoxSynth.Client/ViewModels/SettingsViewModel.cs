@@ -5,12 +5,19 @@ using MoxSynth.Contracts;
 
 namespace MoxSynth.Client.ViewModels;
 
-/// <summary>Price shop, server info and signing out.</summary>
-public sealed partial class SettingsViewModel(MoxApiClient api, AppSession session, INavigator nav, IDialogs dialogs)
+/// <summary>Theme, price shop, server info and signing out.</summary>
+public sealed partial class SettingsViewModel(MoxApiClient api, AppSession session, INavigator nav, IDialogs dialogs,
+    IThemeService themes)
     : ViewModelBase
 {
     [ObservableProperty]
     private PriceProviderDto? _selectedProvider;
+
+    [ObservableProperty]
+    private ThemeDefinition? _selectedTheme;
+
+    /// <summary>Same themes as the web app (choice is stored on the device).</summary>
+    public IReadOnlyList<ThemeDefinition> Themes => ThemeCatalog.All;
 
     public IReadOnlyList<PriceProviderDto> Providers => session.Providers;
     public string ProfileName => session.Me?.Profile.Name ?? "";
@@ -23,6 +30,12 @@ public sealed partial class SettingsViewModel(MoxApiClient api, AppSession sessi
         if (session.Me is null) await RunAsync(() => session.LoadAsync());
         OnPropertyChanged(string.Empty); // everything
         SelectedProvider = session.ProviderInfo;
+        SelectedTheme = ThemeCatalog.Get(themes.Current);
+    }
+
+    partial void OnSelectedThemeChanged(ThemeDefinition? value)
+    {
+        if (value is not null && value.Id != themes.Current) themes.Apply(value.Id);
     }
 
     partial void OnSelectedProviderChanged(PriceProviderDto? value)

@@ -24,6 +24,9 @@ public sealed class MoxApiClient(ITokenStore tokens, Func<HttpMessageHandler>? h
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    /// <summary>Server address used until another one is entered (host name "moxsynth" on the home network).</summary>
+    public const string DefaultServer = "moxsynth:5180";
+
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private HttpClient? _http;
     private string? _baseUrl;

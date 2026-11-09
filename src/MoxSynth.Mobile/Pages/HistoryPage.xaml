@@ -21,10 +21,10 @@
                                 <Label Text="{Binding Symbol}" FontSize="18" FontAttributes="Bold" VerticalOptions="Center">
                                     <Label.Triggers>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsAdded}" Value="True">
-                                            <Setter Property="TextColor" Value="{StaticResource TrendUp}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource ThemeOk}" />
                                         </DataTrigger>
                                         <DataTrigger TargetType="Label" Binding="{Binding IsAdded}" Value="False">
-                                            <Setter Property="TextColor" Value="{StaticResource TrendDown}" />
+                                            <Setter Property="TextColor" Value="{DynamicResource ThemeBad}" />
                                         </DataTrigger>
                                     </Label.Triggers>
                                 </Label>

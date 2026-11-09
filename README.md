@@ -100,6 +100,41 @@ Schema changes: append a new script to `CollectionSchema.Migrations` (tracked vi
 
 Paths can be changed in `appsettings.json` under `Databases`.
 
+## Running in Docker (home server / NAS)
+
+The web app and the API for the Android app run together in one container. Everything that changes – card
+catalogue, profiles, collections, prices and the sign-in keys – lives in `./data` next to `compose.yaml`
+(mounted at `/app/App_Data`), so the container itself can be rebuilt or replaced at any time.
+
+1. Copy the repository to the server (or `git clone` it there).
+2. Create `./data` and put `AllPrintings.sqlite.zip` in it (MTGJSON → All Files; extracted on first start).
+   Moving an existing installation? Copy everything from `src/MoxSynth/App_Data/` into `./data` instead –
+   profiles, collections, prices and sign-ins (`keys/`) come along.
+3. Make the folder writable for the container. Either run it as the folder's owner – create a `.env` file next to
+   `compose.yaml` with `PUID=…` and `PGID=…` (from `id -u` / `id -g`; on Synology the uid/gid of your user) – or
+   give it to the image's default user: `sudo chown -R 1654:1654 data`.
+4. Start it: `docker compose up -d --build`
+5. Open `http://<server>:5180`. Prices can be downloaded from the app (*profile menu → Update prices*), which needs
+   internet access from the container.
+
+`.env` settings (all optional):
+
+| Variable | Default | |
+|---|---|---|
+| `MOXSYNTH_PORT` | `5180` | port on the server (the Android app's default is `moxsynth:5180`) |
+| `PUID` / `PGID` | `1654` | user / group the app runs as – must be able to write `./data` |
+| `TZ` | `Europe/Amsterdam` | time zone for dates shown in the app and in import notes |
+
+Any setting from `appsettings.json` can be overridden with an environment variable in `compose.yaml`
+(`Section__Key`, e.g. `Prices__DefaultProvider: tcgplayer`).
+
+Updating: `git pull && docker compose up -d --build`. Backups: stop the container (or not – SQLite copes) and copy
+`./data` (`prices.db`, `AllPrintings.sqlite` and the zips can be downloaded again; `profiles.db`, `collections/`
+and `keys/` are the irreplaceable part).
+
+The image builds for x64 and ARM64 (Raspberry Pi, most NASes). It serves plain http – fine on the home network; put
+a reverse proxy with HTTPS in front if you ever expose it to the internet.
+
 ## Android app
 
 `src/MoxSynth.Mobile` is a .NET MAUI app for Android that uses the same server (and therefore the same profiles,
@@ -116,9 +151,21 @@ The phone talks to the server over your Wi-Fi, so the server must listen on the 
 dotnet run --project src/MoxSynth --launch-profile lan      # http://0.0.0.0:5180
 ```
 
-Find your computer's IP address (macOS: *System Settings → Wi-Fi → Details*, or `ipconfig getifaddr en0`) and allow
-incoming connections if the firewall asks. In the app enter e.g. `192.168.1.20:5180`, pick your profile and sign in
-with your MoxSynth password. Plain http is only meant for your home network.
+(The Docker container – see *Running in Docker* – already listens on the network.)
+
+The app connects to **`moxsynth:5180`** by default, so give the server computer the name `moxsynth` in your home
+network (e.g. a DNS / DHCP host-name entry in the router). Otherwise enter its IP address instead (macOS:
+*System Settings → Wi-Fi → Details*, or `ipconfig getifaddr en0`), e.g. `192.168.1.20:5180`; the app remembers it.
+Allow incoming connections if the firewall asks, pick your profile and sign in with your MoxSynth password.
+Plain http is only meant for your home network.
+
+### Themes
+
+*Settings → Theme* offers the same themes as the web app: System, Light, Dark, Season (automatic by month), Spring,
+Summer, Autumn, Winter, Neon, Halloween, Steampunk and Cyberpunk – same colours, and the special themes use the same
+heading fonts (Orbitron, Creepster, Cinzel, Rajdhani; bundled under `Resources/Fonts`, SIL Open Font License).
+Palettes live in `MoxSynth.Client/Services/ThemeCatalog.cs`; `ThemeService` turns them into `Theme*` resources that
+all styles use as `DynamicResource`, so switching is instant. The choice is stored per phone.
 
 ### Building the app
 

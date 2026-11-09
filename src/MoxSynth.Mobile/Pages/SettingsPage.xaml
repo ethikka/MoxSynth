@@ -12,6 +12,14 @@
 
             <Border Style="{StaticResource Card}">
                 <VerticalStackLayout Spacing="4">
+                    <Label Text="Theme" FontAttributes="Bold" />
+                    <Label Text="Same themes as the web app; saved on this phone." Style="{StaticResource Muted}" />
+                    <Picker ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="4">
                     <Label Text="Prices from" FontAttributes="Bold" />
                     <Label Text="Shop used for prices, trends and the collection value." Style="{StaticResource Muted}" />
                     <Picker ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" />
@@ -31,7 +39,7 @@
                 </Grid>
             </Border>
 
-            <Button Text="Sign out" Command="{Binding SignOutCommand}" BackgroundColor="{StaticResource Danger}" TextColor="White" />
+            <Button Text="Sign out" Command="{Binding SignOutCommand}" Style="{StaticResource Danger}" />
             <Label Text="Profiles, passwords, imports and price updates are managed in the web app."
                    Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
         </VerticalStackLayout>
