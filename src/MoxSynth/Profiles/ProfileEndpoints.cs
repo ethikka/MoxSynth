@@ -15,15 +15,29 @@ public static class ProfileEndpoints
     public const string StampClaim = "moxsynth:password-stamp";
 
     /// <summary>The signed-in profile, or null when not signed in or the password changed since signing in.</summary>
-    public static Profile? GetSignedInProfile(HttpContext? http, ProfileStore store)
+    public static Profile? GetSignedInProfile(HttpContext? http, ProfileStore store) => GetProfile(http?.User, store);
+
+    /// <summary>
+    /// The profile of a cookie / bearer-token principal, or null when it isn't authenticated, the profile is gone,
+    /// or its password changed since the principal was issued.
+    /// </summary>
+    public static Profile? GetProfile(ClaimsPrincipal? user, ProfileStore store)
     {
-        var user = http?.User;
         if (user?.Identity?.IsAuthenticated != true) return null;
         if (!long.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id)) return null;
 
         var profile = store.Get(id);
         return profile is { HasPassword: true } && profile.PasswordStamp == user.FindFirstValue(StampClaim) ? profile : null;
     }
+
+    /// <summary>Claims of a signed-in profile (cookie and API tokens).</summary>
+    public static ClaimsPrincipal CreatePrincipal(Profile profile, string authenticationType) =>
+        new(new ClaimsIdentity(
+        [
+            new Claim(ClaimTypes.NameIdentifier, profile.Id.ToString()),
+            new Claim(ClaimTypes.Name, profile.Name),
+            new Claim(StampClaim, profile.PasswordStamp ?? ""),
+        ], authenticationType));
 
     public static void MapProfileEndpoints(this IEndpointRouteBuilder app)
     {
@@ -118,18 +132,10 @@ public static class ProfileEndpoints
         });
     }
 
-    private static Task SignInAsync(HttpContext http, Profile profile)
-    {
-        var identity = new ClaimsIdentity(
-        [
-            new Claim(ClaimTypes.NameIdentifier, profile.Id.ToString()),
-            new Claim(ClaimTypes.Name, profile.Name),
-            new Claim(StampClaim, profile.PasswordStamp ?? ""),
-        ], CookieAuthenticationDefaults.AuthenticationScheme);
-
-        return http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity),
+    private static Task SignInAsync(HttpContext http, Profile profile) =>
+        http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+            CreatePrincipal(profile, CookieAuthenticationDefaults.AuthenticationScheme),
             new AuthenticationProperties { IsPersistent = true });
-    }
 
     private static string SafeReturnUrl(string? returnUrl) =>
         returnUrl is { Length: > 0 } && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//") && !returnUrl.StartsWith("/\\")

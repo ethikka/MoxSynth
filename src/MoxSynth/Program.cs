@@ -1,10 +1,12 @@
 using Dapper;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using MoxSynth.Api;
 using MoxSynth.Cards;
 using MoxSynth.Collection;
 using MoxSynth.Components;
 using MoxSynth.Infrastructure;
+using MoxSynth.Prices;
 using MoxSynth.Profiles;
 
 // Map snake_case columns (collection db) onto PascalCase properties.
@@ -36,10 +38,20 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
         options.LoginPath = "/"; // the profile picker
     });
+// JSON API for the Android app: bearer tokens (same Data Protection keys), see Api/ApiEndpoints.cs.
+builder.Services.AddMoxSynthApi();
 builder.Services.AddSingleton<CardRepository>();
 builder.Services.AddSingleton<CardRecognizer>();
 builder.Services.AddSingleton<CardIndex>();
 builder.Services.AddSingleton<ArchidektImporter>();
+
+// Prices: separate prices.db built from MTGJSON AllPrices.json.zip, (re)imported in the background.
+builder.Services.Configure<PriceOptions>(builder.Configuration.GetSection(PriceOptions.SectionName));
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<PriceRepository>();
+builder.Services.AddSingleton<PriceUpdateService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<PriceUpdateService>());
+builder.Services.AddScoped<PriceSettings>();
 builder.Services.AddSingleton<ProfileStore>();
 builder.Services.AddScoped<CurrentProfile>();
 builder.Services.AddScoped<CollectionRepository>(); // per circuit: uses the current profile's database
@@ -64,6 +76,9 @@ app.MapStaticAssets();
 
 // Sign in / out / passwords (form posts; they set the encrypted authentication cookie).
 app.MapProfileEndpoints();
+
+// JSON API (/api/...) for the Android app.
+app.MapMoxSynthApi();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

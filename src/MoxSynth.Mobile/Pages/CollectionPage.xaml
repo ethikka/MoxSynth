@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:controls="clr-namespace:MoxSynth.Mobile.Controls"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     x:Class="MoxSynth.Mobile.Pages.CollectionPage"
+                     x:DataType="vm:CollectionViewModel"
+                     Title="Collection">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Scryfall syntax" Order="Secondary" Clicked="OnToggleScryfall" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+        <SearchBar Text="{Binding Query}" Placeholder="Filter by name" />
+        <SearchBar Grid.Row="1" Text="{Binding Scryfall}" Placeholder="Scryfall syntax, e.g. c:u r:mythic"
+                   IsVisible="{Binding ShowScryfall}" FontFamily="monospace" FontSize="13" />
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Padding="14,0" ColumnSpacing="8">
+            <Label Text="{Binding Summary}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+            <Picker Grid.Column="1" ItemsSource="{Binding Sorts}" SelectedItem="{Binding SelectedSort}" Title="Sort"
+                    FontSize="13" MinimumWidthRequest="140" />
+        </Grid>
+        <Label Grid.Row="3" Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" Margin="14,0" />
+
+        <RefreshView Grid.Row="4" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+            <CollectionView ItemsSource="{Binding Groups}" RemainingItemsThreshold="10"
+                            RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GroupItem">
+                        <Border Style="{StaticResource Row}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnGroupTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="40,*,Auto,Auto" ColumnSpacing="8">
+                                <Image Source="{Binding ImageUrl}" WidthRequest="40" HeightRequest="56" Aspect="AspectFit" />
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
+                                    <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label FormattedText="{Binding ManaCost, Converter={StaticResource ManaCost}}"
+                                           IsVisible="{Binding ManaCost, Converter={StaticResource IsNotNull}}" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="2" VerticalOptions="Center"
+                                                     Opacity="{Binding Price.IsStale, Converter={StaticResource Dimmed}}">
+                                    <Label Text="{Binding Price.Text}" Style="{StaticResource Price}" />
+                                    <Label Text="{Binding Price.ChangeText}" FontSize="11" HorizontalTextAlignment="End"
+                                           TextColor="{Binding Price.Trend, Converter={StaticResource TrendColor}}" />
+                                    <controls:SparklineView Values="{Binding Price.History}" WidthRequest="56" HeightRequest="14"
+                                                            LineColor="{Binding Price.Trend, Converter={StaticResource TrendColor}}" />
+                                    <Label Text="{Binding ValueText}" Style="{StaticResource Muted}" HorizontalTextAlignment="End"
+                                           IsVisible="{Binding ValueText, Converter={StaticResource IsNotNull}}" />
+                                </VerticalStackLayout>
+                                <VerticalStackLayout Grid.Column="3" VerticalOptions="Center" Spacing="2">
+                                    <Button Text="+" Style="{StaticResource Small}" HeightRequest="30" Clicked="OnIncrementClicked" />
+                                    <Label Text="{Binding Quantity}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                                    <Button Text="−" Style="{StaticResource Small}" HeightRequest="30" Clicked="OnDecrementClicked" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <Label Text="No cards here yet – add some from Search or by scanning." Style="{StaticResource Muted}"
+                           HorizontalTextAlignment="Center" Padding="30" />
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</pages:ViewModelPage>

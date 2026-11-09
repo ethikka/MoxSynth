@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:controls="clr-namespace:MoxSynth.Mobile.Controls"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     x:Class="MoxSynth.Mobile.Pages.SearchPage"
+                     x:DataType="vm:SearchViewModel"
+                     Title="Search cards">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Scan" IconImageSource="camera.png" Command="{Binding ScanCommand}" CommandParameter="camera" />
+        <ToolbarItem Text="Scan photo from gallery" Order="Secondary" Command="{Binding ScanCommand}" CommandParameter="gallery" />
+        <ToolbarItem Text="Scryfall syntax" Order="Secondary" Clicked="OnToggleScryfall" />
+        <ToolbarItem Text="Clear" Order="Secondary" Command="{Binding ClearCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+        <!-- Words = parts of the name, a number = collector number ("bolt 146"). -->
+        <SearchBar Text="{Binding Query}" Placeholder="Name or collector number" />
+        <SearchBar Grid.Row="1" Text="{Binding Scryfall}" Placeholder="Scryfall syntax, e.g. t:creature c:g pow&gt;=4"
+                   IsVisible="{Binding ShowScryfall}" FontFamily="monospace" FontSize="13" />
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Padding="14,2">
+            <Label Text="{Binding ResultText}" Style="{StaticResource Muted}" VerticalOptions="Center" />
+            <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="20" />
+        </Grid>
+        <VerticalStackLayout Grid.Row="3" Padding="14,0">
+            <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
+            <HorizontalStackLayout IsVisible="{Binding IsScanning}" Spacing="8">
+                <ActivityIndicator IsRunning="True" HeightRequest="20" />
+                <Label Text="Reading the card…" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="4" ItemsSource="{Binding Results}" RemainingItemsThreshold="5"
+                        RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:CardItem">
+                    <Border Style="{StaticResource Row}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnCardTapped" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="46,*,Auto,Auto" ColumnSpacing="10">
+                            <Image Source="{Binding ImageUrl}" WidthRequest="46" HeightRequest="64" Aspect="AspectFit" />
+                            <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                <Label FormattedText="{Binding ManaCost, Converter={StaticResource ManaCost}}"
+                                       IsVisible="{Binding ManaCost, Converter={StaticResource IsNotNull}}" />
+                                <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                                <Label Text="{Binding OwnedText}" FontSize="12" TextColor="{DynamicResource ThemeOk}"
+                                       IsVisible="{Binding IsOwned}" />
+                            </VerticalStackLayout>
+                            <VerticalStackLayout Grid.Column="2" VerticalOptions="Center" HorizontalOptions="End"
+                                                 IsVisible="{Binding MainPrice, Converter={StaticResource IsNotNull}}"
+                                                 Opacity="{Binding MainPrice.IsStale, Converter={StaticResource Dimmed}}">
+                                <Label Text="{Binding MainPrice.Text}" Style="{StaticResource Price}" />
+                                <Label Text="{Binding MainPrice.ChangeText}" FontSize="11" HorizontalTextAlignment="End"
+                                       TextColor="{Binding MainPrice.Trend, Converter={StaticResource TrendColor}}" />
+                                <controls:SparklineView Values="{Binding MainPrice.History}" WidthRequest="56" HeightRequest="16"
+                                                        LineColor="{Binding MainPrice.Trend, Converter={StaticResource TrendColor}}" />
+                                <Label Text="{Binding OtherPricesText}" Style="{StaticResource Muted}" FontSize="10"
+                                       HorizontalTextAlignment="End" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="3" Text="+" Style="{StaticResource Small}" VerticalOptions="Center"
+                                    Clicked="OnQuickAddClicked" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.EmptyView>
+                <VerticalStackLayout Padding="30" Spacing="12" HorizontalOptions="Center">
+                    <Label Text="Find a card by name (any words, any order) or collector number, or scan one with the camera."
+                           Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+                    <Button Text="Scan a card" Command="{Binding ScanCommand}" CommandParameter="camera" HorizontalOptions="Center" />
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+        </CollectionView>
+    </Grid>
+</pages:ViewModelPage>

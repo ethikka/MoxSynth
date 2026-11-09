@@ -1,0 +1,550 @@
+/* =========================================================================
+   Palette themes: seasons, Halloween, steampunk, cyberpunk
+   -------------------------------------------------------------------------
+   theme.js puts `mx-theme theme-{name}` on <html> (plus data-bs-theme light|dark).
+   Each theme only defines --mx-* variables; the shared rules below map them onto Bootstrap
+   and the app's components. To add a theme: add it to THEMES in theme.js and ThemeSelector.razor,
+   then copy one of the palette blocks at the bottom.
+   (Neon has its own block in app.css.)
+   ========================================================================= */
+
+:root.mx-theme {
+    --bs-body-bg: var(--mx-bg-color);
+    --bs-body-bg-rgb: var(--mx-bg-rgb);
+    --bs-body-color: var(--mx-text);
+    --bs-body-color-rgb: var(--mx-text-rgb);
+    --bs-body-font-family: var(--mx-body-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
+    --bs-emphasis-color: var(--mx-heading);
+    --bs-heading-color: var(--mx-heading);
+    --bs-secondary-color: var(--mx-muted);
+    --bs-secondary-bg: var(--mx-surface-2);
+    --bs-tertiary-bg: var(--mx-surface-2);
+    --bs-border-color: var(--mx-border);
+    --bs-border-color-translucent: var(--mx-border);
+    --bs-primary: var(--mx-accent);
+    --bs-primary-rgb: var(--mx-accent-rgb);
+    --bs-link-color: var(--mx-link);
+    --bs-link-color-rgb: var(--mx-link-rgb);
+    --bs-link-hover-color: var(--mx-link-hover);
+    --bs-link-hover-color-rgb: var(--mx-link-rgb);
+    --bs-success: var(--mx-ok);
+    --bs-success-rgb: var(--mx-ok-rgb);
+    --bs-danger: var(--mx-bad);
+    --bs-danger-rgb: var(--mx-bad-rgb);
+    --bs-info-rgb: var(--mx-link-rgb);
+    --bs-focus-ring-color: rgba(var(--mx-accent-rgb), .3);
+    --bs-border-radius: var(--mx-radius, .375rem);
+    --bs-border-radius-sm: var(--mx-radius, .25rem);
+    --bs-border-radius-lg: var(--mx-radius, .5rem);
+}
+
+.mx-theme body {
+    background: var(--mx-bg);
+    background-color: var(--mx-bg-color);
+    background-attachment: fixed;
+}
+
+/* Headings & brand */
+.mx-theme h1, .mx-theme .h3 {
+    font-family: var(--mx-heading-font, inherit);
+    text-transform: var(--mx-heading-transform, none);
+    letter-spacing: var(--mx-heading-spacing, normal);
+    text-shadow: var(--mx-heading-shadow, none);
+}
+
+.mx-theme h2, .mx-theme .h5, .mx-theme .h6 {
+    font-family: var(--mx-subheading-font, inherit);
+    text-transform: var(--mx-heading-transform, none);
+    letter-spacing: var(--mx-heading-spacing, normal);
+}
+
+.mx-theme .navbar {
+    background: var(--mx-nav-bg) !important;
+    border-bottom: 2px solid var(--mx-nav-border, var(--mx-accent));
+    box-shadow: var(--mx-nav-shadow, 0 2px 8px rgba(0, 0, 0, .15));
+}
+
+.mx-theme .navbar-brand {
+    font-family: var(--mx-brand-font, var(--mx-heading-font, inherit));
+    color: var(--mx-brand-color, #fff) !important;
+    text-transform: var(--mx-heading-transform, none);
+    letter-spacing: var(--mx-heading-spacing, normal);
+    text-shadow: var(--mx-brand-shadow, none);
+}
+
+.mx-theme .navbar .nav-link.active {
+    color: var(--mx-nav-active, #fff) !important;
+}
+
+/* Surfaces */
+.mx-theme .card {
+    --bs-card-bg: var(--mx-surface);
+    --bs-card-cap-bg: var(--mx-surface-2);
+    --bs-card-border-color: var(--mx-border);
+    box-shadow: var(--mx-card-shadow, none);
+}
+
+.mx-theme .table {
+    --bs-table-bg: var(--mx-surface);
+    --bs-table-color: var(--mx-text);
+    --bs-table-hover-bg: rgba(var(--mx-accent-rgb), .08);
+    --bs-table-hover-color: var(--mx-text);
+    --bs-table-active-bg: rgba(var(--mx-accent-rgb), .14);
+    --bs-table-active-color: var(--mx-text);
+    --bs-table-border-color: var(--mx-border);
+}
+
+.mx-theme .list-group {
+    --bs-list-group-bg: var(--mx-surface);
+    --bs-list-group-color: var(--mx-text);
+    --bs-list-group-border-color: var(--mx-border);
+    --bs-list-group-action-hover-bg: rgba(var(--mx-accent-rgb), .08);
+    --bs-list-group-action-hover-color: var(--mx-text);
+}
+
+.mx-theme .dropdown-menu {
+    --bs-dropdown-bg: var(--mx-surface-solid, var(--mx-surface));
+    --bs-dropdown-border-color: var(--mx-border);
+    --bs-dropdown-link-color: var(--mx-text);
+    --bs-dropdown-link-hover-bg: rgba(var(--mx-accent-rgb), .12);
+    --bs-dropdown-link-hover-color: var(--mx-text);
+    --bs-dropdown-header-color: var(--mx-muted);
+}
+
+.mx-theme .form-control, .mx-theme .form-select {
+    background-color: var(--mx-input-bg);
+    border-color: var(--mx-border);
+    color: var(--mx-text);
+}
+
+.mx-theme .form-control::placeholder {
+    color: var(--mx-muted);
+    opacity: .8;
+}
+
+.mx-theme .form-control:focus, .mx-theme .form-select:focus {
+    border-color: var(--mx-accent);
+    box-shadow: 0 0 0 .2rem rgba(var(--mx-accent-rgb), .25);
+}
+
+.mx-theme .form-check-input:checked {
+    background-color: var(--mx-accent);
+    border-color: var(--mx-accent);
+}
+
+/* Buttons */
+.mx-theme .btn-primary {
+    --bs-btn-bg: var(--mx-accent);
+    --bs-btn-border-color: var(--mx-accent);
+    --bs-btn-color: var(--mx-on-accent);
+    --bs-btn-hover-bg: var(--mx-accent-hover);
+    --bs-btn-hover-border-color: var(--mx-accent-hover);
+    --bs-btn-hover-color: var(--mx-on-accent);
+    --bs-btn-active-bg: var(--mx-accent-hover);
+    --bs-btn-active-border-color: var(--mx-accent-hover);
+    --bs-btn-active-color: var(--mx-on-accent);
+    --bs-btn-disabled-bg: var(--mx-accent);
+    --bs-btn-disabled-border-color: var(--mx-accent);
+    --bs-btn-disabled-color: var(--mx-on-accent);
+    box-shadow: var(--mx-glow, none);
+}
+
+.mx-theme .btn-outline-primary {
+    --bs-btn-color: var(--mx-link);
+    --bs-btn-border-color: var(--mx-link);
+    --bs-btn-hover-bg: var(--mx-link);
+    --bs-btn-hover-border-color: var(--mx-link);
+    --bs-btn-hover-color: var(--mx-on-link, #fff);
+    --bs-btn-active-bg: var(--mx-link);
+    --bs-btn-active-border-color: var(--mx-link);
+    --bs-btn-active-color: var(--mx-on-link, #fff);
+}
+
+.mx-theme .btn-outline-secondary {
+    --bs-btn-color: var(--mx-muted);
+    --bs-btn-border-color: var(--mx-border);
+    --bs-btn-hover-bg: rgba(var(--mx-accent-rgb), .15);
+    --bs-btn-hover-border-color: var(--mx-accent);
+    --bs-btn-hover-color: var(--mx-text);
+    --bs-btn-active-bg: rgba(var(--mx-accent-rgb), .25);
+    --bs-btn-active-border-color: var(--mx-accent);
+    --bs-btn-active-color: var(--mx-text);
+}
+
+.mx-theme .btn-check:checked + .btn-outline-secondary {
+    background: rgba(var(--mx-accent-rgb), .25);
+    border-color: var(--mx-accent);
+}
+
+.mx-theme .btn-link {
+    --bs-btn-color: var(--mx-link);
+    --bs-btn-hover-color: var(--mx-link-hover);
+}
+
+/* Badges, pagination, alerts */
+.mx-theme .text-bg-success {
+    color: var(--mx-on-ok, #fff) !important;
+}
+
+.mx-theme .text-bg-info {
+    background-color: var(--mx-link) !important;
+    color: var(--mx-on-link, #fff) !important;
+}
+
+.mx-theme .pagination {
+    --bs-pagination-bg: var(--mx-surface);
+    --bs-pagination-color: var(--mx-link);
+    --bs-pagination-border-color: var(--mx-border);
+    --bs-pagination-hover-bg: rgba(var(--mx-accent-rgb), .12);
+    --bs-pagination-hover-color: var(--mx-text);
+    --bs-pagination-active-bg: var(--mx-accent);
+    --bs-pagination-active-border-color: var(--mx-accent);
+    --bs-pagination-active-color: var(--mx-on-accent);
+    --bs-pagination-disabled-bg: var(--mx-surface);
+}
+
+.mx-theme .alert-light {
+    --bs-alert-bg: var(--mx-surface);
+    --bs-alert-color: var(--mx-text);
+    --bs-alert-border-color: var(--mx-border);
+}
+
+.mx-theme .stat-value {
+    font-family: var(--mx-heading-font, inherit);
+    color: var(--mx-stat-color, var(--mx-heading));
+    text-shadow: var(--mx-heading-shadow, none);
+}
+
+.mx-theme .card-image {
+    box-shadow: var(--mx-image-shadow, 0 2px 10px rgba(0, 0, 0, .3));
+}
+
+.mx-theme .profile-tile:hover, .mx-theme .profile-tile:focus-visible,
+.mx-theme .profile-tile.selected {
+    border-color: var(--mx-accent);
+}
+
+/* =========================================================================
+   Spring – fresh greens and blossom pink
+   ========================================================================= */
+:root.theme-spring {
+    --mx-bg: radial-gradient(circle at 8% 0%, rgba(255, 182, 206, .45), transparent 38%),
+             radial-gradient(circle at 92% 8%, rgba(178, 235, 190, .55), transparent 42%),
+             #f6fbf5;
+    --mx-bg-color: #f6fbf5;
+    --mx-bg-rgb: 246, 251, 245;
+    --mx-text: #22372a;
+    --mx-text-rgb: 34, 55, 42;
+    --mx-heading: #1f5133;
+    --mx-muted: #5d7566;
+    --mx-surface: rgba(255, 255, 255, .9);
+    --mx-surface-solid: #ffffff;
+    --mx-surface-2: #eef7ef;
+    --mx-input-bg: #ffffff;
+    --mx-border: #d5e8d8;
+    --mx-accent: #2f9e5a;
+    --mx-accent-rgb: 47, 158, 90;
+    --mx-accent-hover: #24804a;
+    --mx-on-accent: #ffffff;
+    --mx-link: #c2407a;
+    --mx-link-rgb: 194, 64, 122;
+    --mx-link-hover: #9c2c5e;
+    --mx-ok: #2f9e5a;
+    --mx-ok-rgb: 47, 158, 90;
+    --mx-bad: #d6336c;
+    --mx-bad-rgb: 214, 51, 108;
+    --mx-nav-bg: linear-gradient(90deg, #2f6b45, #3f8a59);
+    --mx-nav-border: #f7a8c4;
+    --mx-card-shadow: 0 2px 10px rgba(47, 107, 69, .08);
+    --mx-radius: .75rem;
+}
+
+/* =========================================================================
+   Summer – sky, sea and sunset
+   ========================================================================= */
+:root.theme-summer {
+    --mx-bg: radial-gradient(circle at 92% 4%, rgba(255, 214, 102, .65), transparent 16%),
+             linear-gradient(180deg, #d4efff 0, #fff4da 460px);
+    --mx-bg-color: #fff4da;
+    --mx-bg-rgb: 255, 244, 218;
+    --mx-text: #23323f;
+    --mx-text-rgb: 35, 50, 63;
+    --mx-heading: #0b5c8f;
+    --mx-muted: #5b6f80;
+    --mx-surface: rgba(255, 255, 255, .88);
+    --mx-surface-solid: #ffffff;
+    --mx-surface-2: #f1f8fd;
+    --mx-input-bg: #ffffff;
+    --mx-border: #cfe4f1;
+    --mx-accent: #0c8ed9;
+    --mx-accent-rgb: 12, 142, 217;
+    --mx-accent-hover: #0a74b2;
+    --mx-on-accent: #ffffff;
+    --mx-link: #e8590c;
+    --mx-link-rgb: 232, 89, 12;
+    --mx-link-hover: #bf4600;
+    --mx-ok: #2b9348;
+    --mx-ok-rgb: 43, 147, 72;
+    --mx-bad: #e03131;
+    --mx-bad-rgb: 224, 49, 49;
+    --mx-nav-bg: linear-gradient(90deg, #0b6aa2, #1490c9);
+    --mx-nav-border: #ffc94d;
+    --mx-card-shadow: 0 3px 12px rgba(12, 142, 217, .1);
+    --mx-radius: .6rem;
+}
+
+/* =========================================================================
+   Autumn – burnt orange, rust and gold
+   ========================================================================= */
+:root.theme-autumn {
+    --mx-bg: radial-gradient(circle at 0% 0%, rgba(232, 116, 41, .2), transparent 45%),
+             radial-gradient(circle at 100% 100%, rgba(156, 72, 17, .16), transparent 42%),
+             #fbf3e6;
+    --mx-bg-color: #fbf3e6;
+    --mx-bg-rgb: 251, 243, 230;
+    --mx-text: #3b2a1e;
+    --mx-text-rgb: 59, 42, 30;
+    --mx-heading: #7a3410;
+    --mx-muted: #7d6656;
+    --mx-surface: rgba(255, 251, 244, .92);
+    --mx-surface-solid: #fffbf4;
+    --mx-surface-2: #f6e8d6;
+    --mx-input-bg: #fffdf8;
+    --mx-border: #e8d2b8;
+    --mx-accent: #c2410c;
+    --mx-accent-rgb: 194, 65, 12;
+    --mx-accent-hover: #9a330a;
+    --mx-on-accent: #ffffff;
+    --mx-link: #8a4b12;
+    --mx-link-rgb: 138, 75, 18;
+    --mx-link-hover: #643509;
+    --mx-ok: #5c8a1e;
+    --mx-ok-rgb: 92, 138, 30;
+    --mx-bad: #b42318;
+    --mx-bad-rgb: 180, 35, 24;
+    --mx-nav-bg: linear-gradient(90deg, #5b2c0f, #7d3c14);
+    --mx-nav-border: #d4a017;
+    --mx-subheading-font: Georgia, "Times New Roman", serif;
+    --mx-heading-font: Georgia, "Times New Roman", serif;
+    --mx-card-shadow: 0 2px 10px rgba(122, 52, 16, .08);
+}
+
+/* =========================================================================
+   Winter – icy blues with falling-snow dots
+   ========================================================================= */
+:root.theme-winter {
+    --mx-bg: radial-gradient(rgba(255, 255, 255, .95) 1.2px, transparent 1.7px) 0 0 / 28px 28px,
+             radial-gradient(rgba(255, 255, 255, .7) 1px, transparent 1.4px) 14px 14px / 28px 28px,
+             linear-gradient(180deg, #cfe2f3 0, #eaf2fa 620px);
+    --mx-bg-color: #eaf2fa;
+    --mx-bg-rgb: 234, 242, 250;
+    --mx-text: #1f2f40;
+    --mx-text-rgb: 31, 47, 64;
+    --mx-heading: #1c4a78;
+    --mx-muted: #5b7088;
+    --mx-surface: rgba(255, 255, 255, .93);
+    --mx-surface-solid: #ffffff;
+    --mx-surface-2: #eef4fa;
+    --mx-input-bg: #ffffff;
+    --mx-border: #c9dcef;
+    --mx-accent: #2b6cb0;
+    --mx-accent-rgb: 43, 108, 176;
+    --mx-accent-hover: #215892;
+    --mx-on-accent: #ffffff;
+    --mx-link: #3c5a99;
+    --mx-link-rgb: 60, 90, 153;
+    --mx-link-hover: #2a4275;
+    --mx-ok: #2b8a6e;
+    --mx-ok-rgb: 43, 138, 110;
+    --mx-bad: #c92a2a;
+    --mx-bad-rgb: 201, 42, 42;
+    --mx-nav-bg: linear-gradient(90deg, #1f3b5c, #2c5282);
+    --mx-nav-border: #bfe0ff;
+    --mx-card-shadow: 0 2px 12px rgba(31, 59, 92, .1);
+    --mx-heading-shadow: 0 1px 0 #fff;
+}
+
+/* =========================================================================
+   Halloween – pumpkin orange and witchy purple under a harvest moon
+   ========================================================================= */
+:root.theme-halloween {
+    --mx-bg: radial-gradient(circle at 88% 7%, rgba(255, 179, 71, .55) 0, rgba(255, 140, 0, .25) 5%, transparent 13%),
+             radial-gradient(ellipse at 50% -20%, rgba(106, 27, 154, .5), transparent 60%),
+             radial-gradient(ellipse at 50% 120%, rgba(255, 117, 24, .14), transparent 55%),
+             #120a16;
+    --mx-bg-color: #120a16;
+    --mx-bg-rgb: 18, 10, 22;
+    --mx-text: #eadff0;
+    --mx-text-rgb: 234, 223, 240;
+    --mx-heading: #ff9a3c;
+    --mx-muted: #a893b3;
+    --mx-surface: rgba(30, 16, 36, .88);
+    --mx-surface-solid: #1e1024;
+    --mx-surface-2: #2a1532;
+    --mx-input-bg: #170c1c;
+    --mx-border: #4a2a57;
+    --mx-accent: #ff7518;
+    --mx-accent-rgb: 255, 117, 24;
+    --mx-accent-hover: #ff8f3f;
+    --mx-on-accent: #1a0d00;
+    --mx-link: #c39bff;
+    --mx-link-rgb: 195, 155, 255;
+    --mx-link-hover: #dcc4ff;
+    --mx-on-link: #1a0d22;
+    --mx-ok: #8bd34a;
+    --mx-ok-rgb: 139, 211, 74;
+    --mx-on-ok: #102000;
+    --mx-bad: #ff4d6d;
+    --mx-bad-rgb: 255, 77, 109;
+    --mx-nav-bg: #0d0610;
+    --mx-nav-border: #ff7518;
+    --mx-nav-shadow: 0 0 18px rgba(255, 117, 24, .35);
+    --mx-heading-font: "Creepster", "Chiller", cursive;
+    --mx-heading-spacing: .06em;
+    --mx-heading-shadow: 0 0 10px rgba(255, 117, 24, .55);
+    --mx-brand-color: #ff7518;
+    --mx-brand-shadow: 0 0 8px rgba(255, 117, 24, .7);
+    --mx-stat-color: #ff9a3c;
+    --mx-card-shadow: 0 0 14px rgba(106, 27, 154, .25);
+    --mx-glow: 0 0 10px rgba(255, 117, 24, .45);
+    --mx-image-shadow: 0 0 18px rgba(255, 117, 24, .35);
+}
+
+.theme-halloween h1, .theme-halloween .h3 {
+    font-size: 2.1rem; /* Creepster runs small */
+}
+
+/* =========================================================================
+   Steampunk – brass and copper on dark leather, Victorian type
+   ========================================================================= */
+:root.theme-steampunk {
+    --mx-bg: radial-gradient(ellipse at 50% -10%, rgba(200, 150, 62, .22), transparent 60%),
+             repeating-linear-gradient(45deg, rgba(255, 255, 255, .018) 0 2px, transparent 2px 7px),
+             #1d140c;
+    --mx-bg-color: #1d140c;
+    --mx-bg-rgb: 29, 20, 12;
+    --mx-text: #efe2c8;
+    --mx-text-rgb: 239, 226, 200;
+    --mx-heading: #e3b766;
+    --mx-muted: #b39c7a;
+    --mx-surface: rgba(43, 30, 18, .92);
+    --mx-surface-solid: #2b1e12;
+    --mx-surface-2: #382816;
+    --mx-input-bg: #241910;
+    --mx-border: #7a5a2e;
+    --mx-accent: #c8963e;
+    --mx-accent-rgb: 200, 150, 62;
+    --mx-accent-hover: #ddab52;
+    --mx-on-accent: #1d140c;
+    --mx-link: #e09a5c;
+    --mx-link-rgb: 224, 154, 92;
+    --mx-link-hover: #f2b27a;
+    --mx-on-link: #1d140c;
+    --mx-ok: #9bbf5a;
+    --mx-ok-rgb: 155, 191, 90;
+    --mx-on-ok: #1d140c;
+    --mx-bad: #e0644e;
+    --mx-bad-rgb: 224, 100, 78;
+    --mx-nav-bg: linear-gradient(180deg, #3a2714, #24170c);
+    --mx-nav-border: #c8963e;
+    --mx-nav-shadow: 0 2px 0 #5c4320, 0 4px 14px rgba(0, 0, 0, .5);
+    --mx-heading-font: "Cinzel", Georgia, serif;
+    --mx-subheading-font: "Cinzel", Georgia, serif;
+    --mx-body-font: Georgia, "Times New Roman", serif;
+    --mx-heading-spacing: .04em;
+    --mx-heading-shadow: 0 1px 0 #000, 0 0 8px rgba(200, 150, 62, .35);
+    --mx-brand-color: #e3b766;
+    --mx-stat-color: #e3b766;
+    --mx-card-shadow: inset 0 0 0 1px rgba(227, 183, 102, .15), 0 3px 10px rgba(0, 0, 0, .45);
+    --mx-radius: .2rem;
+    --mx-image-shadow: 0 0 0 3px #7a5a2e, 0 4px 16px rgba(0, 0, 0, .6);
+}
+
+/* Brass rivets in the corners of panels */
+.theme-steampunk .card {
+    background-image:
+        radial-gradient(circle at 8px 8px, #d9b46a 2.2px, transparent 2.8px),
+        radial-gradient(circle at calc(100% - 8px) 8px, #d9b46a 2.2px, transparent 2.8px),
+        radial-gradient(circle at 8px calc(100% - 8px), #d9b46a 2.2px, transparent 2.8px),
+        radial-gradient(circle at calc(100% - 8px) calc(100% - 8px), #d9b46a 2.2px, transparent 2.8px);
+}
+
+.theme-steampunk .btn {
+    font-family: "Cinzel", Georgia, serif;
+    letter-spacing: .03em;
+}
+
+/* =========================================================================
+   Cyberpunk – yellow, cyan and magenta on a neon grid, cut corners
+   ========================================================================= */
+:root.theme-cyberpunk {
+    --mx-bg: linear-gradient(rgba(0, 240, 255, .05) 1px, transparent 1px) 0 0 / 32px 32px,
+             linear-gradient(90deg, rgba(0, 240, 255, .05) 1px, transparent 1px) 0 0 / 32px 32px,
+             radial-gradient(ellipse at 85% -10%, rgba(255, 42, 109, .28), transparent 50%),
+             radial-gradient(ellipse at 0% 110%, rgba(0, 240, 255, .14), transparent 50%),
+             #0b0b10;
+    --mx-bg-color: #0b0b10;
+    --mx-bg-rgb: 11, 11, 16;
+    --mx-text: #e6e8f0;
+    --mx-text-rgb: 230, 232, 240;
+    --mx-heading: #fcee0a;
+    --mx-muted: #8a90a6;
+    --mx-surface: rgba(18, 18, 28, .92);
+    --mx-surface-solid: #12121c;
+    --mx-surface-2: #1b1b2a;
+    --mx-input-bg: #0e0e16;
+    --mx-border: #2e3350;
+    --mx-accent: #fcee0a;
+    --mx-accent-rgb: 252, 238, 10;
+    --mx-accent-hover: #fff566;
+    --mx-on-accent: #0b0b10;
+    --mx-link: #00f0ff;
+    --mx-link-rgb: 0, 240, 255;
+    --mx-link-hover: #7ff8ff;
+    --mx-on-link: #0b0b10;
+    --mx-ok: #00ff9c;
+    --mx-ok-rgb: 0, 255, 156;
+    --mx-on-ok: #0b0b10;
+    --mx-bad: #ff2a6d;
+    --mx-bad-rgb: 255, 42, 109;
+    --mx-nav-bg: #050508;
+    --mx-nav-border: #fcee0a;
+    --mx-nav-shadow: 0 2px 0 #ff2a6d, 0 0 20px rgba(252, 238, 10, .25);
+    --mx-heading-font: "Rajdhani", "Orbitron", sans-serif;
+    --mx-subheading-font: "Rajdhani", sans-serif;
+    --mx-heading-transform: uppercase;
+    --mx-heading-spacing: .12em;
+    --mx-heading-shadow: 2px 2px 0 #ff2a6d, -1px -1px 0 rgba(0, 240, 255, .7);
+    --mx-brand-color: #fcee0a;
+    --mx-brand-shadow: 2px 2px 0 #ff2a6d;
+    --mx-nav-active: #00f0ff;
+    --mx-stat-color: #00f0ff;
+    --mx-card-shadow: 0 0 0 1px rgba(0, 240, 255, .08), 0 0 16px rgba(0, 240, 255, .08);
+    --mx-radius: 0;
+    --mx-image-shadow: 4px 4px 0 #ff2a6d, -2px -2px 0 rgba(0, 240, 255, .7);
+}
+
+/* Cut corners on buttons and panels */
+.theme-cyberpunk .btn {
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    font-family: "Rajdhani", sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+}
+
+.theme-cyberpunk .card {
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+    border-left: 3px solid #fcee0a;
+}
+
+.theme-cyberpunk .navbar .nav-link {
+    font-family: "Rajdhani", sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.theme-cyberpunk .sparkline polyline {
+    filter: drop-shadow(0 0 2px currentColor);
+}

@@ -2,6 +2,8 @@
 @inject CardRepository Cards
 @inject CollectionRepository Collection
 @inject NavigationManager Nav
+@inject PriceRepository Prices
+@inject PriceSettings PriceSettings
 @implements IDisposable
 
 <PageTitle>Search cards · MoxSynth</PageTitle>
@@ -135,6 +137,7 @@ else if (_result is not null)
                 <th>Type</th>
                 <th>Set</th>
                 <th>#</th>
+                <th>@(Prices.IsAvailable ? $"Price ({PriceProviders.Label(PriceSettings.Provider)})" : "")</th>
                 <th class="text-center">Owned</th>
                 <th class="text-end">Quick add (NM)</th>
             </tr>
@@ -160,6 +163,25 @@ else if (_result is not null)
                         @card.SetName <span class="text-muted">(@card.SetCode)</span>
                     </td>
                     <td class="small @(_numberMode ? "fw-bold" : "")">@card.Number</td>
+                    <td class="small">
+                        @if (_prices.TryGetValue(card.Uuid, out var cardPrices))
+                        {
+                            // Main finish first (usually non-foil), other finishes below without sparkline.
+                            var first = true;
+                            foreach (var finish in card.FinishList.Where(cardPrices.ContainsKey))
+                            {
+                                <div>
+                                    <PriceTrend Price="cardPrices[finish]" Sparkline="first"
+                                                Label="@(first && finish == CardFinishes.NonFoil ? null : CardFinishes.Short(finish))" />
+                                </div>
+                                first = false;
+                            }
+                        }
+                        else if (Prices.IsAvailable)
+                        {
+                            <span class="text-body-secondary">–</span>
+                        }
+                    </td>
                     <td class="text-center">
                         @if (owned > 0)
                         {
@@ -203,6 +225,7 @@ else if (_result is not null)
     private IReadOnlyList<SetInfo> _sets = [];
     private PagedResult<CardSummary>? _result;
     private Dictionary<string, long> _owned = new();
+    private Dictionary<string, Dictionary<string, PriceInfo>> _prices = new();
     private bool _loading;
     private bool _numberMode;
     private Toast? _toast;
@@ -247,10 +270,12 @@ else if (_result is not null)
         _loading = true;
         var result = await Cards.SearchAsync(query);
         var owned = await Collection.GetOwnedCountsAsync(result.Items.Select(c => c.Uuid));
+        var prices = await Prices.GetAsync(result.Items.Select(c => c.Uuid), PriceSettings.Provider);
         if (version != _searchVersion) return;
 
         _result = result;
         _owned = owned;
+        _prices = prices;
         _numberMode = query.HasCollectorNumber;
         _loading = false;
     }
@@ -291,7 +316,25 @@ else if (_result is not null)
         Navigate(1);
     }
 
-    public void Dispose() => _debounce?.Cancel();
+    protected override void OnInitialized() => PriceSettings.Changed += OnPriceProviderChanged;
+
+    // Another price source was chosen in the navbar: reload the prices of the shown cards.
+    private async void OnPriceProviderChanged()
+    {
+        if (_result is null) return;
+        var prices = await Prices.GetAsync(_result.Items.Select(c => c.Uuid), PriceSettings.Provider);
+        await InvokeAsync(() =>
+        {
+            _prices = prices;
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        _debounce?.Cancel();
+        PriceSettings.Changed -= OnPriceProviderChanged;
+    }
 
     private void ToggleColor(char c)
     {

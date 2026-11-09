@@ -125,6 +125,9 @@ public sealed class CollectionQuery
     public string? Name { get; set; }
     public string? SetCode { get; set; }
     public string? Finish { get; set; }
+    /// <summary>Price provider for prices, value and price sorting (null = no prices).</summary>
+    public string? PriceProvider { get; set; }
+    public CollectionSort Sort { get; set; } = CollectionSort.Name;
     /// <summary>Optional Scryfall-syntax filter (same syntax as on the Search page).</summary>
     public string? Scryfall { get; set; }
     /// <summary>When set, shows the collection as it was at this UTC moment.</summary>
@@ -133,7 +136,23 @@ public sealed class CollectionQuery
     public int PageSize { get; set; } = 50;
 }
 
-public sealed record CollectionPage(PagedResult<CollectionGroup> Groups, long TotalCopies);
+public sealed record CollectionPage(PagedResult<CollectionGroup> Groups, long TotalCopies)
+{
+    /// <summary>Sum of the current prices of all matching copies (null without prices).</summary>
+    public double? TotalValue { get; init; }
+    public string? Currency { get; init; }
+    /// <summary>Matching copies without a price at the chosen provider.</summary>
+    public long UnpricedCopies { get; init; }
+}
+
+public enum CollectionSort
+{
+    Name,
+    ValueDesc,
+    PriceDesc,
+    RisingDesc,
+    FallingDesc,
+}
 
 /// <summary>A file import into the collection (see <see cref="ArchidektImporter"/>).</summary>
 public sealed class ImportRecord

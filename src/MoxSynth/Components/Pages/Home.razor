@@ -1,6 +1,8 @@
 @page "/"
 @inject CollectionRepository Collection
 @inject CardRepository Cards
+@inject PriceRepository Prices
+@inject PriceSettings PriceSettings
 
 <PageTitle>MoxSynth</PageTitle>
 
@@ -20,6 +22,22 @@ else
         <StatTile Label="Removed (30 days)" Value="@_stats.RemovedLast30Days" />
         <StatTile Label="Removed (all time)" Value="@_stats.RemovedCopies" />
     </div>
+    @if (_value?.TotalValue is { } total)
+    {
+        <div class="card card-body mb-4 d-flex flex-row flex-wrap align-items-baseline gap-3">
+            <div>
+                <div class="text-muted small">Estimated collection value (@PriceProviders.Label(PriceSettings.Provider))</div>
+                <div class="stat-value">@(PriceProviders.CurrencySymbol(_value.Currency))@total.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</div>
+            </div>
+            <div class="small text-body-secondary">
+                @if (_value.UnpricedCopies > 0)
+                {
+                    <span>@_value.UnpricedCopies.ToString("N0") cards without a price. </span>
+                }
+                <a href="collection">Most valuable cards →</a>
+            </div>
+        </div>
+    }
 
     <div class="d-flex justify-content-between align-items-baseline">
         <h2 class="h5">Recent activity</h2>
@@ -56,11 +74,13 @@ else
     private CollectionStats? _stats;
     private IReadOnlyList<HistoryEvent> _recent = [];
     private CardDbMeta? _meta;
+    private CollectionPage? _value;
 
     protected override async Task OnInitializedAsync()
     {
         _stats = await Collection.GetStatsAsync();
         _recent = (await Collection.GetHistoryAsync(1, 10)).Items;
         _meta = await Cards.GetMetaAsync();
+        if (Prices.IsAvailable) _value = await Collection.GetValueAsync(PriceSettings.Provider);
     }
 }

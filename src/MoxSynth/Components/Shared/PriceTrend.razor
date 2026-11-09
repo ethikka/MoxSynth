@@ -1,0 +1,83 @@
+@using System.Globalization
+@* Current price with its 7-day change and a sparkline of the last ~90 days. *@
+@if (Price is null)
+{
+    <span class="text-body-secondary small">–</span>
+}
+else
+{
+    var change = Price.Change7d;
+    var trend = change is null || Math.Abs(change.Value) < 0.005 ? "flat" : change > 0 ? "up" : "down";
+    <span class="price-trend price-@trend @(Price.IsStale ? "price-stale" : "")" title="@Tooltip()">
+        @if (!string.IsNullOrEmpty(Label))
+        {
+            <span class="price-label">@Label</span>
+        }
+        @if (ShowValue)
+        {
+            <span class="price-value">@Price.Format(Amount)</span>
+        }
+        @if (ShowValue && change is not null)
+        {
+            <span class="price-change">@(trend switch { "up" => "▲", "down" => "▼", _ => "→" })@Math.Abs(change.Value * 100).ToString("0", CultureInfo.InvariantCulture)%</span>
+        }
+        @if (Sparkline && SparklinePoints() is { } points)
+        {
+            <svg class="sparkline" viewBox="0 0 @Width @Height" width="@Width" height="@Height" aria-hidden="true">
+                <polyline points="@points" />
+            </svg>
+        }
+    </span>
+}
+
+@code {
+    [Parameter] public PriceInfo? Price { get; set; }
+    /// <summary>Shown amount (e.g. quantity × price); defaults to the unit price.</summary>
+    [Parameter] public double? Amount { get; set; }
+    [Parameter] public bool Sparkline { get; set; } = true;
+    /// <summary>False = only the sparkline (e.g. in a table that already has price/change columns).</summary>
+    [Parameter] public bool ShowValue { get; set; } = true;
+    [Parameter] public string? Label { get; set; }
+    [Parameter] public int Width { get; set; } = 56;
+    [Parameter] public int Height { get; set; } = 16;
+
+    private string Tooltip()
+    {
+        if (Price is null) return "";
+        static string Pct(double? c) => c is null ? "–" : (c > 0 ? "+" : "") + (c.Value * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        var stale = Price.IsStale ? $"\nNo recent price – last seen on {Price.LastDate}." : "";
+        return $"{PriceProviders.Label(Price.Provider)} · {Price.Format()} on {Price.LastDate}{stale}\n" +
+               $"7 days: {Pct(Price.Change7d)} · 30 days: {Pct(Price.Change30d)} · since {Price.FirstDate}: {Pct(Price.ChangeFirst)}";
+    }
+
+    private string? SparklinePoints()
+    {
+        var values = Price!.HistoryValues();
+        if (values.Length < 2) return null;
+
+        // Fill gaps with the previous known price.
+        var filled = new float[values.Length];
+        var last = float.NaN;
+        for (var i = 0; i < values.Length; i++)
+        {
+            if (!float.IsNaN(values[i])) last = values[i];
+            filled[i] = last;
+        }
+        var known = filled.Where(v => !float.IsNaN(v)).ToArray();
+        if (known.Length < 2) return null;
+        var min = known.Min();
+        var max = known.Max();
+        var range = max - min;
+
+        var sb = new System.Text.StringBuilder();
+        for (var i = 0; i < filled.Length; i++)
+        {
+            if (float.IsNaN(filled[i])) continue;
+            var x = i * (Width - 2) / (double)(filled.Length - 1) + 1;
+            var y = range < 1e-6 ? Height / 2.0 : (Height - 2) - (filled[i] - min) / range * (Height - 4) + 1;
+            sb.Append(x.ToString("0.#", CultureInfo.InvariantCulture)).Append(',')
+              .Append(y.ToString("0.#", CultureInfo.InvariantCulture)).Append(' ');
+        }
+        return sb.ToString().TrimEnd();
+    }
+}

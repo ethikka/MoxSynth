@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:controls="clr-namespace:MoxSynth.Mobile.Controls"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     xmlns:c="clr-namespace:MoxSynth.Contracts;assembly=MoxSynth.Contracts"
+                     x:Class="MoxSynth.Mobile.Pages.CardDetailPage"
+                     x:DataType="vm:CardDetailViewModel"
+                     Title="{Binding Title}">
+    <RefreshView IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+        <ScrollView>
+            <VerticalStackLayout Padding="12" Spacing="10">
+                <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+                <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
+
+                <Image Source="{Binding ShownImageUrl}" HeightRequest="340" Aspect="AspectFit" />
+                <Button Text="Turn card over" Style="{StaticResource Secondary}" HorizontalOptions="Center"
+                        Command="{Binding ToggleFaceCommand}" IsVisible="{Binding HasBackImage}" />
+
+                <Label Text="{Binding Title}" Style="{StaticResource Title}" />
+                <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
+
+                <!-- Rules text per face -->
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Faces}" Spacing="8">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="c:CardFaceDto">
+                            <Border Style="{StaticResource Card}">
+                                <VerticalStackLayout Spacing="4">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                        <Label Grid.Column="1" FormattedText="{Binding ManaCost, Converter={StaticResource ManaCost}}" />
+                                    </Grid>
+                                    <Label Text="{Binding Type}" FontAttributes="Italic" />
+                                    <Label Text="{Binding Text}" IsVisible="{Binding Text, Converter={StaticResource IsNotNull}}" />
+                                    <Label Text="{Binding FlavorText}" Style="{StaticResource Muted}" FontAttributes="Italic"
+                                           IsVisible="{Binding FlavorText, Converter={StaticResource IsNotNull}}" />
+                                    <Label IsVisible="{Binding Power, Converter={StaticResource IsNotNull}}" FontAttributes="Bold">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="{Binding Power}" />
+                                                <Span Text="/" />
+                                                <Span Text="{Binding Toughness}" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <Label Text="{Binding Loyalty, StringFormat='Loyalty {0}'}" FontAttributes="Bold"
+                                           IsVisible="{Binding Loyalty, Converter={StaticResource IsNotNull}}" />
+                                    <Label Text="{Binding Artist, StringFormat='Illustrated by {0}'}" Style="{StaticResource Muted}"
+                                           IsVisible="{Binding Artist, Converter={StaticResource IsNotNull}}" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <!-- Add copies -->
+                <Label Text="Your collection" Style="{StaticResource Heading}" />
+                <Border Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="{Binding OwnedText}" />
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                            <Picker Title="Finish" ItemsSource="{Binding Finishes}" SelectedItem="{Binding SelectedFinish}" />
+                            <Picker Grid.Column="1" Title="Condition" ItemsSource="{Binding Conditions}"
+                                    SelectedItem="{Binding SelectedCondition}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="8">
+                            <Button Text="−" Style="{StaticResource Small}" Command="{Binding ChangeQuantityCommand}" CommandParameter="-1" />
+                            <Label Grid.Column="1" Text="{Binding Quantity}" FontSize="18" FontAttributes="Bold"
+                                   VerticalOptions="Center" MinimumWidthRequest="28" HorizontalTextAlignment="Center" />
+                            <Button Grid.Column="2" Text="+" Style="{StaticResource Small}" Command="{Binding ChangeQuantityCommand}" CommandParameter="1" />
+                            <Button Grid.Column="3" Text="Add to collection" Command="{Binding AddCommand}" />
+                        </Grid>
+                    </VerticalStackLayout>
+                </Border>
+
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Copies}" Spacing="4" IsVisible="{Binding HasCopies}">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CopyItem">
+                            <Border Style="{StaticResource Card}" Padding="10,6" Opacity="{Binding IsRemoved, Converter={StaticResource Dimmed}}">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <VerticalStackLayout VerticalOptions="Center">
+                                        <Label Text="{Binding Title}" FontAttributes="Bold" />
+                                        <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
+                                        <Label Text="{Binding Notes}" Style="{StaticResource Muted}" FontAttributes="Italic"
+                                               IsVisible="{Binding HasNotes}" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="1" Text="Remove" Style="{StaticResource Secondary}" VerticalOptions="Center"
+                                            Clicked="OnRemoveClicked" IsVisible="{Binding IsRemoved, Converter={StaticResource Not}}" />
+                                    <Button Grid.Column="1" Text="Undo" Style="{StaticResource Secondary}" VerticalOptions="Center"
+                                            Clicked="OnRestoreClicked" IsVisible="{Binding IsRemoved}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <!-- Price details: every shop × finish -->
+                <Label Text="Prices" Style="{StaticResource Heading}" IsVisible="{Binding HasPrices}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding Prices}" Spacing="6">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PriceRow">
+                            <Border Style="{StaticResource Card}" Opacity="{Binding Price.IsStale, Converter={StaticResource Dimmed}}">
+                                <Border.Triggers>
+                                    <DataTrigger TargetType="Border" Binding="{Binding IsSelectedProvider}" Value="True">
+                                        <Setter Property="Stroke" Value="{DynamicResource ThemeAccent}" />
+                                    </DataTrigger>
+                                </Border.Triggers>
+                                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+                                    <Label Text="{Binding Title}" FontAttributes="Bold" Grid.ColumnSpan="2" />
+                                    <Label Grid.Column="2" Text="{Binding Current}" Style="{StaticResource Price}" FontSize="16" />
+
+                                    <controls:SparklineView Grid.Row="1" Grid.ColumnSpan="3" Values="{Binding History}" HeightRequest="36"
+                                                            LineColor="{Binding TrendFirst, Converter={StaticResource TrendColor}}" />
+
+                                    <Label Grid.Row="2" Text="7 days" Style="{StaticResource Muted}" />
+                                    <Label Grid.Row="2" Grid.Column="1" Text="30 days" Style="{StaticResource Muted}" />
+                                    <Label Grid.Row="2" Grid.Column="2" Text="{Binding Period}" Style="{StaticResource Muted}" />
+                                    <Label Grid.Row="3" Text="{Binding Change7d}" TextColor="{Binding Trend7d, Converter={StaticResource TrendColor}}" />
+                                    <Label Grid.Row="3" Grid.Column="1" Text="{Binding Change30d}" TextColor="{Binding Trend30d, Converter={StaticResource TrendColor}}" />
+                                    <Label Grid.Row="3" Grid.Column="2" Text="{Binding ChangeFirst}" TextColor="{Binding TrendFirst, Converter={StaticResource TrendColor}}" />
+                                    <Label Grid.Row="4" Grid.ColumnSpan="3" Style="{StaticResource Muted}">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="Low " />
+                                                <Span Text="{Binding Low}" />
+                                                <Span Text=" · High " />
+                                                <Span Text="{Binding High}" />
+                                                <Span Text=" · Avg " />
+                                                <Span Text="{Binding Average}" />
+                                                <Span Text=" · " />
+                                                <Span Text="{Binding LastUpdate}" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+
+                <!-- Other printings -->
+                <Label Text="Other printings" Style="{StaticResource Heading}" IsVisible="{Binding HasOtherPrintings}" />
+                <VerticalStackLayout BindableLayout.ItemsSource="{Binding OtherPrintings}" Spacing="2">
+                    <BindableLayout.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CardItem">
+                            <Grid ColumnDefinitions="*,Auto" Padding="4,8">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer Tapped="OnPrintingTapped" />
+                                </Grid.GestureRecognizers>
+                                <VerticalStackLayout>
+                                    <Label Text="{Binding SetName}" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="1" Text="{Binding OwnedText}" FontSize="12" TextColor="{DynamicResource ThemeOk}"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                        </DataTemplate>
+                    </BindableLayout.ItemTemplate>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </ScrollView>
+    </RefreshView>
+</pages:ViewModelPage>

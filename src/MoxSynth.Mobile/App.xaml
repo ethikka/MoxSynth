@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  Colours and fonts come from the active theme (Services/ThemeService.cs puts them into the resources; same themes as
+  the web app). Always use them as DynamicResource so switching themes updates every page immediately:
+  Theme + PageBrush, Surface, Surface2, Border, Text, Heading, Muted, Accent, OnAccent, Link, Ok, Bad, NavBackground,
+  NavForeground, NavAccent, InputBackground, HeadingFont, HeadingTransform, CornerRadius (e.g. ThemeAccent) – the prefix
+  keeps them apart from style keys such as "Muted".
+-->
+<Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:MoxSynth.Mobile.Controls"
+             x:Class="MoxSynth.Mobile.App">
+    <Application.Resources>
+        <ResourceDictionary>
+            <controls:TrendColorConverter x:Key="TrendColor" />
+            <controls:ManaCostConverter x:Key="ManaCost" />
+            <controls:IsNotNullConverter x:Key="IsNotNull" />
+            <controls:InvertedBoolConverter x:Key="Not" />
+            <controls:DimmedOpacityConverter x:Key="Dimmed" />
+
+            <Style TargetType="ContentPage" ApplyToDerivedTypes="True">
+                <Setter Property="Background" Value="{DynamicResource ThemePageBrush}" />
+            </Style>
+
+            <Style TargetType="Label">
+                <Setter Property="TextColor" Value="{DynamicResource ThemeText}" />
+                <Setter Property="FontSize" Value="14" />
+            </Style>
+            <Style x:Key="Title" TargetType="Label">
+                <Setter Property="FontSize" Value="24" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="FontFamily" Value="{DynamicResource ThemeHeadingFont}" />
+                <Setter Property="TextTransform" Value="{DynamicResource ThemeHeadingTransform}" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeHeading}" />
+            </Style>
+            <Style x:Key="Heading" TargetType="Label">
+                <Setter Property="FontSize" Value="17" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="FontFamily" Value="{DynamicResource ThemeHeadingFont}" />
+                <Setter Property="TextTransform" Value="{DynamicResource ThemeHeadingTransform}" />
+                <Setter Property="Margin" Value="0,12,0,4" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeHeading}" />
+            </Style>
+            <Style x:Key="Muted" TargetType="Label">
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeMuted}" />
+            </Style>
+            <Style x:Key="Error" TargetType="Label">
+                <Setter Property="TextColor" Value="{DynamicResource ThemeBad}" />
+                <Setter Property="FontSize" Value="13" />
+            </Style>
+            <Style x:Key="Price" TargetType="Label">
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="HorizontalTextAlignment" Value="End" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeText}" />
+            </Style>
+            <Style x:Key="Link" TargetType="Label">
+                <Setter Property="TextColor" Value="{DynamicResource ThemeLink}" />
+            </Style>
+
+            <Style TargetType="Border" x:Key="Card">
+                <Setter Property="BackgroundColor" Value="{DynamicResource ThemeSurface}" />
+                <Setter Property="Stroke" Value="{DynamicResource ThemeBorder}" />
+                <Setter Property="StrokeThickness" Value="1" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 10" />
+                <Setter Property="Padding" Value="12" />
+            </Style>
+            <Style TargetType="Border" x:Key="Row">
+                <Setter Property="BackgroundColor" Value="{DynamicResource ThemeSurface}" />
+                <Setter Property="Stroke" Value="{DynamicResource ThemeBorder}" />
+                <Setter Property="StrokeThickness" Value="1" />
+                <Setter Property="StrokeShape" Value="RoundRectangle 8" />
+                <Setter Property="Padding" Value="8" />
+                <Setter Property="Margin" Value="12,3" />
+            </Style>
+
+            <Style TargetType="Button">
+                <Setter Property="BackgroundColor" Value="{DynamicResource ThemeAccent}" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeOnAccent}" />
+                <Setter Property="CornerRadius" Value="{DynamicResource ThemeCornerRadius}" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="FontFamily" Value="{DynamicResource ThemeHeadingFont}" />
+                <Setter Property="TextTransform" Value="{DynamicResource ThemeHeadingTransform}" />
+                <Setter Property="Padding" Value="14,8" />
+                <Setter Property="MinimumHeightRequest" Value="40" />
+            </Style>
+            <Style x:Key="Secondary" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="Transparent" />
+                <Setter Property="BorderColor" Value="{DynamicResource ThemeLink}" />
+                <Setter Property="BorderWidth" Value="1" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeLink}" />
+                <Setter Property="CornerRadius" Value="{DynamicResource ThemeCornerRadius}" />
+                <Setter Property="FontFamily" Value="{DynamicResource ThemeHeadingFont}" />
+                <Setter Property="TextTransform" Value="{DynamicResource ThemeHeadingTransform}" />
+                <Setter Property="Padding" Value="12,6" />
+                <Setter Property="MinimumHeightRequest" Value="36" />
+            </Style>
+            <Style x:Key="Danger" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="{DynamicResource ThemeBad}" />
+                <Setter Property="TextColor" Value="White" />
+                <Setter Property="CornerRadius" Value="{DynamicResource ThemeCornerRadius}" />
+                <Setter Property="FontAttributes" Value="Bold" />
+                <Setter Property="MinimumHeightRequest" Value="40" />
+            </Style>
+            <!-- Small square buttons (+1 / −1 / add) in list rows -->
+            <Style x:Key="Small" TargetType="Button">
+                <Setter Property="BackgroundColor" Value="Transparent" />
+                <Setter Property="BorderColor" Value="{DynamicResource ThemeBorder}" />
+                <Setter Property="BorderWidth" Value="1" />
+                <Setter Property="TextColor" Value="{DynamicResource ThemeLink}" />
+                <Setter Property="CornerRadius" Value="{DynamicResource ThemeCornerRadius}" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="WidthRequest" Value="40" />
+                <Setter Property="HeightRequest" Value="36" />
+                <Setter Property="FontSize" Value="16" />
+            </Style>
+
+            <Style TargetType="Entry">
+                <Setter Property="TextColor" Value="{DynamicResource ThemeText}" />
+                <Setter Property="PlaceholderColor" Value="{DynamicResource ThemeMuted}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource ThemeInputBackground}" />
+            </Style>
+            <Style TargetType="SearchBar">
+                <Setter Property="TextColor" Value="{DynamicResource ThemeText}" />
+                <Setter Property="PlaceholderColor" Value="{DynamicResource ThemeMuted}" />
+                <Setter Property="CancelButtonColor" Value="{DynamicResource ThemeAccent}" />
+                <Setter Property="BackgroundColor" Value="{DynamicResource ThemeSurface2}" />
+            </Style>
+            <Style TargetType="Picker">
+                <Setter Property="TextColor" Value="{DynamicResource ThemeText}" />
+                <Setter Property="TitleColor" Value="{DynamicResource ThemeMuted}" />
+            </Style>
+            <Style TargetType="ActivityIndicator">
+                <Setter Property="Color" Value="{DynamicResource ThemeAccent}" />
+            </Style>
+            <Style TargetType="RefreshView">
+                <Setter Property="RefreshColor" Value="{DynamicResource ThemeAccent}" />
+            </Style>
+
+            <Style TargetType="Shell" ApplyToDerivedTypes="True">
+                <Setter Property="Shell.BackgroundColor" Value="{DynamicResource ThemeNavBackground}" />
+                <Setter Property="Shell.ForegroundColor" Value="{DynamicResource ThemeNavForeground}" />
+                <Setter Property="Shell.TitleColor" Value="{DynamicResource ThemeNavForeground}" />
+                <Setter Property="Shell.TabBarBackgroundColor" Value="{DynamicResource ThemeNavBackground}" />
+                <Setter Property="Shell.TabBarForegroundColor" Value="{DynamicResource ThemeNavAccent}" />
+                <Setter Property="Shell.TabBarTitleColor" Value="{DynamicResource ThemeNavAccent}" />
+                <Setter Property="Shell.TabBarUnselectedColor" Value="{DynamicResource ThemeMuted}" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

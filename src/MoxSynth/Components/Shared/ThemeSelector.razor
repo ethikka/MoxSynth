@@ -1,20 +1,27 @@
 @inject IJSRuntime JS
 
-<select class="form-select form-select-sm theme-select" aria-label="Colour scheme" title="Colour scheme"
+<select class="form-select form-select-sm theme-select" aria-label="Theme" title="Theme"
         value="@_theme" @onchange="OnChangeAsync">
-    @foreach (var (value, label) in Themes)
+    @foreach (var (group, themes) in Groups)
     {
-        <option value="@value">@label</option>
+        <optgroup label="@group">
+            @foreach (var (value, label) in themes)
+            {
+                <option value="@value">@label</option>
+            }
+        </optgroup>
     }
 </select>
 
 @code {
-    private static readonly (string Value, string Label)[] Themes =
+    // Keep in sync with THEMES in wwwroot/theme.js.
+    private static readonly (string Group, (string Value, string Label)[] Themes)[] Groups =
     [
-        ("system", "◐ System"),
-        ("light", "☀ Light"),
-        ("dark", "☾ Dark"),
-        ("neon", "⚡ Neon"),
+        ("Basic", [("system", "◐ System"), ("light", "☀ Light"), ("dark", "☾ Dark")]),
+        ("Seasons", [("seasonal", "↻ Season (automatic)"), ("spring", "✿ Spring"), ("summer", "☼ Summer"),
+                     ("autumn", "❦ Autumn"), ("winter", "❄ Winter")]),
+        ("Special", [("neon", "⚡ Neon"), ("halloween", "☠ Halloween"), ("steampunk", "⚙ Steampunk"),
+                     ("cyberpunk", "⌁ Cyberpunk")]),
     ];
 
     private string _theme = "system";

@@ -53,6 +53,13 @@ h1:focus {
     margin-left: .5rem;
 }
 
+/* The navbar (and its profile menu) must always stay above the page content. Don't put filter/backdrop-filter/
+   transform on the navbar: that traps the dropdown in the navbar's layer and confines its fixed click-away layer. */
+.navbar {
+    position: relative;
+    z-index: 1030;
+}
+
 .theme-select {
     width: auto;
     min-width: 8.5rem;
@@ -82,7 +89,7 @@ h1:focus {
    Light
    ========================================================================= */
 
-[data-bs-theme="light"] body {
+[data-bs-theme="light"]:not(.mx-theme) body {
     background: #f6f7f9;
 }
 
@@ -90,7 +97,7 @@ h1:focus {
    Dark – Bootstrap's dark mode, slightly deeper page background
    ========================================================================= */
 
-[data-bs-theme="dark"]:not(.theme-neon) body {
+[data-bs-theme="dark"]:not(.theme-neon):not(.mx-theme) body {
     background: #16181c;
 }
 
@@ -153,8 +160,8 @@ h1:focus {
 }
 
 .theme-neon .navbar {
-    background: rgba(11, 7, 22, .82) !important;
-    backdrop-filter: blur(6px);
+    /* No backdrop-filter here: it would become the containing block of the profile menu's fixed click-away layer. */
+    background: rgba(11, 7, 22, .96) !important;
     border-bottom: 1px solid var(--neon-pink);
     box-shadow: 0 0 18px rgba(var(--neon-pink-rgb), .45);
 }
@@ -485,3 +492,61 @@ h1:focus {
 .theme-neon .profile-avatar {
     box-shadow: 0 0 10px rgba(var(--neon-violet-rgb), .7);
 }
+
+/* =========================================================================
+   Prices
+   ========================================================================= */
+
+.price-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.price-label {
+    font-size: .75em;
+    color: var(--bs-secondary-color);
+}
+
+.price-change {
+    font-size: .8em;
+}
+
+.price-up .price-change { color: var(--bs-success); }
+.price-down .price-change { color: var(--bs-danger); }
+.price-flat .price-change { color: var(--bs-secondary-color); }
+
+.sparkline polyline {
+    fill: none;
+    stroke-width: 1.4;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    stroke: var(--bs-secondary-color);
+}
+
+.price-up .sparkline polyline { stroke: var(--bs-success); }
+.price-down .sparkline polyline { stroke: var(--bs-danger); }
+
+.price-stale {
+    opacity: .55;
+    font-style: italic;
+}
+
+.price-details td, .price-details th {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.theme-neon .price-change-cell.text-success { color: var(--neon-lime) !important; }
+.theme-neon .price-change-cell.text-danger { color: var(--neon-pink) !important; }
+
+.price-provider-select {
+    width: auto;
+    min-width: 7.5rem;
+}
+
+.theme-neon .price-up .price-change, .theme-neon .price-up .sparkline polyline { color: var(--neon-lime); stroke: var(--neon-lime); }
+.theme-neon .price-down .price-change, .theme-neon .price-down .sparkline polyline { color: var(--neon-pink); stroke: var(--neon-pink); }
+.theme-neon .sparkline polyline { filter: drop-shadow(0 0 2px currentColor); }

@@ -1,7 +1,7 @@
 @inject CurrentProfile Current
 @implements IDisposable
 
-<div class="profile-menu">
+<div class="profile-menu d-flex align-items-center gap-2">
     <button type="button" class="btn btn-sm btn-dark d-flex align-items-center gap-2" @onclick="() => _open = !_open"
             aria-expanded="@(_open ? "true" : "false")">
         <ProfileAvatar Profile="Current.Value" Size="26" />
@@ -17,15 +17,14 @@
             @if (Current.IsAdmin)
             {
                 <a class="dropdown-item" href="profiles" @onclick="() => _open = false">Manage profiles</a>
+                <a class="dropdown-item" href="prices" @onclick="() => _open = false">Update prices</a>
             }
             <div class="dropdown-divider"></div>
-            @* Plain form post: the server removes the sign-in cookie and reloads to the profile picker. *@
-            <form method="post" action="profile/logout" class="m-0">
-                <AntiforgeryToken />
-                <button type="submit" class="dropdown-item">Sign out / switch profile</button>
-            </form>
+            <LogoutButton ButtonClass="dropdown-item">Log out / switch profile</LogoutButton>
         </div>
     }
+    @* Always visible in the navbar, not only inside the menu. *@
+    <LogoutButton ButtonClass="btn btn-sm btn-outline-light text-nowrap">⏻ <span class="d-none d-lg-inline">Log out</span></LogoutButton>
 </div>
 
 @code {

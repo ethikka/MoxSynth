@@ -1,0 +1,19 @@
+@using System.Globalization
+@* Price change as a coloured percentage, with the earlier price in the tooltip. *@
+@if (Change is { } c)
+{
+    var cls = Math.Abs(c) < 0.005 ? "text-body-secondary" : c > 0 ? "text-success" : "text-danger";
+    <span class="@cls price-change-cell" title="@(Then is { } then && Price is not null ? $"was {Price.Format(then)}" : null)">
+        @(Math.Abs(c) < 0.005 ? "→ " : c > 0 ? "▲ " : "▼ ")@((c * 100).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture))%
+    </span>
+}
+else
+{
+    <span class="text-body-secondary">–</span>
+}
+
+@code {
+    [Parameter] public double? Change { get; set; }
+    [Parameter] public double? Then { get; set; }
+    [Parameter] public PriceInfo? Price { get; set; }
+}

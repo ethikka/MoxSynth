@@ -1,6 +1,9 @@
 @page "/card/{Uuid}"
 @inject CardRepository Cards
 @inject CollectionRepository Collection
+@inject PriceRepository Prices
+@inject PriceSettings PriceSettings
+@implements IDisposable
 
 <PageTitle>@(_card?.Name ?? "Card") · MoxSynth</PageTitle>
 
@@ -66,6 +69,21 @@ else
                         }
                     </div>
                 </div>
+            }
+
+            @if (_cardPrices.Count > 0)
+            {
+                <h2 class="h6 mt-4">Prices (@PriceProviders.Label(PriceSettings.Provider))</h2>
+                <ul class="list-group small mb-3">
+                    @foreach (var finish in _card.FinishList.Where(_cardPrices.ContainsKey))
+                    {
+                        var price = _cardPrices[finish];
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>@CardFinishes.Label(finish)</span>
+                            <PriceTrend Price="price" Width="120" Height="24" />
+                        </li>
+                    }
+                </ul>
             }
 
             @if (_card.OtherPrintings.Count > 0)
@@ -213,6 +231,68 @@ else
             </div>
         </div>
     </div>
+
+    @if (_allPrices.Count > 0)
+    {
+        <h2 class="h5 mt-4 mb-2">Price details</h2>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle price-details">
+                <thead>
+                    <tr>
+                        <th>Shop</th>
+                        <th>Finish</th>
+                        <th class="text-end">Current</th>
+                        <th class="text-end">7 days</th>
+                        <th class="text-end">30 days</th>
+                        <th class="text-end">Period</th>
+                        <th class="text-end">Low</th>
+                        <th class="text-end">High</th>
+                        <th class="text-end">Average</th>
+                        <th>Last update</th>
+                        <th class="text-end">Your copies</th>
+                        <th>Trend</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in OrderedPrices())
+                    {
+                        var stats = row.Stats();
+                        var owned = _copies.Count(c => c.IsOwned && c.Finish == row.Finish);
+                        <tr class="@(row.Provider == PriceSettings.Provider ? "table-active" : "") @(row.IsStale ? "price-stale" : "")">
+                            <td>@PriceProviders.Label(row.Provider) <span class="text-body-secondary small">@row.Currency</span></td>
+                            <td>@CardFinishes.Label(row.Finish)</td>
+                            <td class="text-end fw-semibold">@row.Format()</td>
+                            <td class="text-end"><PriceChange Change="row.Change7d" Then="row.Price7d" Price="row" /></td>
+                            <td class="text-end"><PriceChange Change="row.Change30d" Then="row.Price30d" Price="row" /></td>
+                            <td class="text-end" title="Since @row.FirstDate"><PriceChange Change="row.ChangeFirst" Then="row.PriceFirst" Price="row" /></td>
+                            <td class="text-end" title="@stats.LowDate">@row.Format(stats.Low)</td>
+                            <td class="text-end" title="@stats.HighDate">@row.Format(stats.High)</td>
+                            <td class="text-end">@row.Format(stats.Average)</td>
+                            <td class="small text-nowrap">
+                                @row.LastDate
+                                @if (row.IsStale)
+                                {
+                                    <span class="badge text-bg-warning gap-start-1" title="This shop has no recent price for this finish">old</span>
+                                }
+                            </td>
+                            <td class="text-end text-nowrap">
+                                @if (owned > 0)
+                                {
+                                    <span>@owned × = <strong>@row.Format(row.Price * owned)</strong></span>
+                                }
+                            </td>
+                            <td><PriceTrend Price="row" ShowValue="false" Width="180" Height="28" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <p class="small text-body-secondary">
+            Daily retail prices from MTGJSON (@_allPrices.Min(p => p.FirstDate) – @_allPrices.Max(p => p.LastDate)).
+            “Period” is the change since the first price in that range; low, high and average are over the same days
+            (hover for the date). The highlighted rows are the shop selected in the navbar.
+        </p>
+    }
 }
 
 <Toast @ref="_toast" />
@@ -230,6 +310,25 @@ else
     private bool _loading = true;
     private IReadOnlyList<CollectionCard> _copies = [];
     private Dictionary<string, long> _ownedOther = new();
+    private Dictionary<string, PriceInfo> _cardPrices = new();
+    private IReadOnlyList<PriceInfo> _allPrices = [];
+
+    protected override void OnInitialized() => PriceSettings.Changed += OnPriceProviderChanged;
+
+    // Another shop was chosen in the navbar: all shops are already loaded, just re-pick and re-order.
+    private void OnPriceProviderChanged() => InvokeAsync(() =>
+    {
+        _cardPrices = _allPrices.Where(p => p.Provider == PriceSettings.Provider).ToDictionary(p => p.Finish);
+        StateHasChanged();
+    });
+
+    public void Dispose() => PriceSettings.Changed -= OnPriceProviderChanged;
+
+    // Selected shop first, then the others; within a shop the card's finish order (non-foil, foil, etched).
+    private IEnumerable<PriceInfo> OrderedPrices() => _allPrices
+        .OrderBy(p => p.Provider == PriceSettings.Provider ? 0 : 1)
+        .ThenBy(p => p.Provider)
+        .ThenBy(p => _card is null ? 0 : Math.Max(0, _card.FinishList.ToList().IndexOf(p.Finish)) );
     private bool _showRemoved;
     private Toast? _toast;
 
@@ -255,6 +354,8 @@ else
             _finish = _card.FinishList[0];
             _language = _card.Primary.Language ?? "English";
             _ownedOther = await Collection.GetOwnedCountsAsync(_card.OtherPrintings.Select(o => o.Uuid));
+            _allPrices = await Prices.GetAllForCardAsync(_card.Uuid);
+            _cardPrices = _allPrices.Where(p => p.Provider == PriceSettings.Provider).ToDictionary(p => p.Finish);
             await LoadCopiesAsync();
         }
         _loading = false;

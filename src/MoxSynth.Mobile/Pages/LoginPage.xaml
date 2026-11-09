@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     xmlns:c="clr-namespace:MoxSynth.Contracts;assembly=MoxSynth.Contracts"
+                     x:Class="MoxSynth.Mobile.Pages.LoginPage"
+                     x:DataType="vm:LoginViewModel"
+                     Title="Sign in">
+    <ScrollView>
+        <VerticalStackLayout Padding="20,40,20,20" Spacing="14">
+            <Label Text="MoxSynth" Style="{StaticResource Title}" FontSize="30" HorizontalOptions="Center" />
+            <Label Text="Your Magic collection, on your phone" Style="{StaticResource Muted}" HorizontalOptions="Center" />
+
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="Server" FontAttributes="Bold" />
+                    <Label Style="{StaticResource Muted}"
+                           Text="Address of the computer running MoxSynth on your Wi-Fi – moxsynth:5180 unless you changed it, or its IP address, e.g. 192.168.1.20:5180" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Entry Text="{Binding ServerUrl}" Placeholder="moxsynth:5180" Keyboard="Url"
+                               ReturnCommand="{Binding ConnectCommand}" />
+                        <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectCommand}" Style="{StaticResource Secondary}" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
+            <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
+
+            <Label Text="Who's collecting?" Style="{StaticResource Heading}" IsVisible="{Binding IsConnected}" />
+            <FlexLayout BindableLayout.ItemsSource="{Binding Profiles}" Wrap="Wrap" JustifyContent="Start"
+                        IsVisible="{Binding IsConnected}">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="c:ProfileDto">
+                        <Border Style="{StaticResource Card}" Margin="0,0,10,10" Padding="10" WidthRequest="96">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnProfileTapped" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout Spacing="6">
+                                <Border WidthRequest="48" HeightRequest="48" StrokeShape="Ellipse" StrokeThickness="0"
+                                        BackgroundColor="{Binding Color}" HorizontalOptions="Center">
+                                    <Label Text="{Binding Initial}" TextColor="White" FontSize="22" FontAttributes="Bold"
+                                           HorizontalOptions="Center" VerticalOptions="Center" />
+                                </Border>
+                                <Label Text="{Binding Name}" HorizontalTextAlignment="Center" LineBreakMode="TailTruncation" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </FlexLayout>
+
+            <Border Style="{StaticResource Card}" IsVisible="{Binding HasSelectedProfile}">
+                <VerticalStackLayout Spacing="8">
+                    <Label Text="{Binding SelectedProfile.Name, StringFormat='Password for {0}'}" FontAttributes="Bold" />
+                    <Entry x:Name="PasswordEntry" Text="{Binding Password}" IsPassword="True" Placeholder="Password"
+                           ReturnCommand="{Binding SignInCommand}" />
+                    <Button Text="Sign in" Command="{Binding SignInCommand}" />
+                </VerticalStackLayout>
+            </Border>
+        </VerticalStackLayout>
+    </ScrollView>
+</pages:ViewModelPage>

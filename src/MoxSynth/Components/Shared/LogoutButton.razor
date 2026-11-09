@@ -1,0 +1,13 @@
+@* Log out = plain form post: the server removes the sign-in cookie and reloads to the profile picker. *@
+<form method="post" action="profile/logout" class="@FormClass">
+    <AntiforgeryToken />
+    <button type="submit" class="@ButtonClass" title="Log out (you can then pick another profile)">
+        @ChildContent
+    </button>
+</form>
+
+@code {
+    [Parameter] public string FormClass { get; set; } = "m-0";
+    [Parameter] public string ButtonClass { get; set; } = "btn btn-sm btn-outline-light";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+}

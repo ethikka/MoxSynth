@@ -1,6 +1,8 @@
 @page "/collection"
 @inject CollectionRepository Collection
 @inject CardRepository Cards
+@inject PriceRepository Prices
+@inject PriceSettings PriceSettings
 @implements IDisposable
 
 <PageTitle>Collection · MoxSynth</PageTitle>
@@ -73,13 +75,38 @@
 }
 else
 {
-    <p class="text-muted small">
-        @_page.TotalCopies.ToString("N0") cards in @_page.Groups.TotalCount.ToString("N0") groups
-        @if (_query.AsOf is not null)
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <span class="text-muted small">
+            @_page.TotalCopies.ToString("N0") cards in @_page.Groups.TotalCount.ToString("N0") groups
+            @if (_query.AsOf is not null)
+            {
+                <span class="badge text-bg-info gap-start-2">Historic view: @SqliteTime.Display(_query.AsOf) (read-only, current prices)</span>
+            }
+        </span>
+        @if (_page.TotalValue is { } total)
         {
-            <span class="badge text-bg-info gap-start-2">Historic view: @SqliteTime.Display(_query.AsOf) (read-only)</span>
+            <span class="collection-value" title="Sum of the current @PriceProviders.Label(PriceSettings.Provider) prices of all matching cards">
+                Estimated value: <strong>@(PriceProviders.CurrencySymbol(_page.Currency))@total.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)</strong>
+                @if (_page.UnpricedCopies > 0)
+                {
+                    <span class="text-body-secondary small">(@_page.UnpricedCopies.ToString("N0") without price)</span>
+                }
+            </span>
         }
-    </p>
+        @if (Prices.IsAvailable)
+        {
+            <div class="ms-auto d-flex align-items-center gap-2">
+                <label class="small text-body-secondary" for="sort">Sort</label>
+                <select id="sort" class="form-select form-select-sm w-auto" @bind="_query.Sort" @bind:after="SearchAsync">
+                    <option value="@CollectionSort.Name">Name</option>
+                    <option value="@CollectionSort.ValueDesc">Value (high → low)</option>
+                    <option value="@CollectionSort.PriceDesc">Price (high → low)</option>
+                    <option value="@CollectionSort.RisingDesc">Rising most (7 days)</option>
+                    <option value="@CollectionSort.FallingDesc">Falling most (7 days)</option>
+                </select>
+            </div>
+        }
+    </div>
 
     @if (_page.Groups.Items.Count == 0)
     {
@@ -98,6 +125,11 @@ else
                     <th>Cond.</th>
                     <th>Lang</th>
                     <th class="text-center">Qty</th>
+                    @if (Prices.IsAvailable)
+                    {
+                        <th>Price (@PriceProviders.Label(PriceSettings.Provider))</th>
+                        <th class="text-end">Value</th>
+                    }
                     <th>Last added</th>
                     <th></th>
                 </tr>
@@ -126,6 +158,17 @@ else
                         <td class="small">@g.Condition.Short()</td>
                         <td class="small">@g.Language</td>
                         <td class="text-center fw-semibold">@g.Quantity</td>
+                        @if (Prices.IsAvailable)
+                        {
+                            var price = _prices.GetValueOrDefault(g.CardUuid)?.GetValueOrDefault(g.Finish);
+                            <td class="small"><PriceTrend Price="price" /></td>
+                            <td class="small text-end">
+                                @if (price is not null)
+                                {
+                                    @price.Format(price.Price * g.Quantity)
+                                }
+                            </td>
+                        }
                         <td class="small text-muted">@SqliteTime.Display(g.LastAddedAt)</td>
                         <td class="text-end text-nowrap">
                             @if (_query.AsOf is null)
@@ -156,7 +199,8 @@ else
     private Dictionary<string, CardSummary> _cardInfo = new();
     private Toast? _toast;
     private CancellationTokenSource? _debounce;
-    private int _loadVersion;   // drops results of loads that were overtaken by newer ones
+    private int _loadVersion;
+    private Dictionary<string, Dictionary<string, PriceInfo>> _prices = new();   // drops results of loads that were overtaken by newer ones
 
     protected override async Task OnInitializedAsync()
     {
@@ -170,10 +214,13 @@ else
     private async Task LoadAsync()
     {
         var version = ++_loadVersion;
+        _query.PriceProvider = Prices.IsAvailable ? PriceSettings.Provider : null;
         var page = await Collection.GetGroupsAsync(_query);
         var cardInfo = await Cards.GetSummariesAsync(page.Groups.Items.Select(g => g.CardUuid));
+        var prices = await Prices.GetAsync(page.Groups.Items.Select(g => g.CardUuid), PriceSettings.Provider);
         if (version != _loadVersion) return;
         _page = page;
+        _prices = prices;
         _cardInfo = cardInfo;
     }
 
@@ -193,7 +240,20 @@ else
         await SearchAsync();
     }
 
-    public void Dispose() => _debounce?.Cancel();
+    protected override void OnInitialized() => PriceSettings.Changed += OnPriceProviderChanged;
+
+    // Another price source was chosen in the navbar: reload prices, value and price sorting.
+    private void OnPriceProviderChanged() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        _debounce?.Cancel();
+        PriceSettings.Changed -= OnPriceProviderChanged;
+    }
 
     /// <summary>Dropdowns, date and Enter: apply immediately.</summary>
     private async Task SearchAsync()

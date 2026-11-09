@@ -1,0 +1,36 @@
+@inject PriceSettings Settings
+@inject PriceRepository Prices
+@inject IJSRuntime JS
+
+@if (Prices.IsAvailable && Settings.Providers.Count > 1)
+{
+    <select class="form-select form-select-sm price-provider-select" aria-label="Price source" title="Price source"
+            value="@Settings.Provider" @onchange="OnChangeAsync">
+        @foreach (var provider in Settings.Providers)
+        {
+            <option value="@provider">@PriceProviders.Label(provider)</option>
+        }
+    </select>
+}
+
+@code {
+    private const string StorageKey = "moxsynth-price-provider";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        var saved = await JS.InvokeAsync<string?>("moxPrefs.get", StorageKey);
+        if (!string.IsNullOrEmpty(saved) && saved != Settings.Provider)
+        {
+            Settings.Set(saved);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnChangeAsync(ChangeEventArgs e)
+    {
+        var provider = e.Value?.ToString() ?? "";
+        Settings.Set(provider);
+        await JS.InvokeVoidAsync("moxPrefs.set", StorageKey, provider);
+    }
+}

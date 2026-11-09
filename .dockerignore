@@ -1,0 +1,16 @@
+# Only the server sources are needed in the image.
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/*.user
+**/.DS_Store
+.git/
+data/
+
+# Personal data and big downloads never go into the image – they live in the App_Data volume.
+src/MoxSynth/App_Data/*
+
+# Not part of the server image.
+src/MoxSynth.Mobile/
+src/MoxSynth.Client/
