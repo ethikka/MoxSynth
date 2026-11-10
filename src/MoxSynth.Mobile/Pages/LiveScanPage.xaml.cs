@@ -1,8 +1,13 @@
 using System.ComponentModel;
-using AndroidX.Camera.View;
 using MoxSynth.Client.Services;
 using MoxSynth.Contracts;
 using MoxSynth.Mobile.Services;
+
+#if ANDROID
+using NativePreview = AndroidX.Camera.View.PreviewView;
+#elif IOS
+using NativePreview = MoxSynth.Mobile.Controls.CameraPreviewView;
+#endif
 
 namespace MoxSynth.Mobile.Pages;
 
@@ -74,7 +79,7 @@ public partial class LiveScanPage : ContentPage
 
     private async void StartCamera()
     {
-        if (_camera is not null || _closing || Preview.Handler?.PlatformView is not PreviewView view) return;
+        if (_camera is not null || _closing || Preview.Handler?.PlatformView is not NativePreview view) return;
 
         var camera = new LiveCardCamera(view, OnTextReadAsync);
         camera.Bound += () => TorchButton.IsVisible = camera.HasFlashUnit;

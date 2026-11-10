@@ -1,12 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    MoxSynth for Android (.NET MAUI). Talks to the MoxSynth server's JSON API (/api); all logic lives in
-    MoxSynth.Client (view models, API client), this project adds pages and Android services.
-    Requires the MAUI Android workload:  dotnet workload install maui-android
+    MoxSynth for Android and iOS (.NET MAUI). Talks to the MoxSynth server's JSON API (/api); all logic lives in
+    MoxSynth.Client (view models, API client), this project adds pages and platform services.
+    Requires the MAUI workloads:  dotnet workload install maui-android  (and on a Mac with Xcode: maui-ios)
+    The iOS target is only added on macOS, so the Android app still builds on Windows / Linux.
   -->
   <PropertyGroup>
-    <TargetFramework>net10.0-android</TargetFramework>
+    <TargetFrameworks>net10.0-android</TargetFrameworks>
+    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net10.0-ios</TargetFrameworks>
     <OutputType>Exe</OutputType>
     <RootNamespace>MoxSynth.Mobile</RootNamespace>
     <UseMaui>true</UseMaui>
@@ -18,7 +20,8 @@
     <ApplicationId>com.ethikka.moxsynth</ApplicationId>
     <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
     <ApplicationVersion>1</ApplicationVersion>
-    <SupportedOSPlatformVersion>24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="'$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework)))' == 'android'">24.0</SupportedOSPlatformVersion>
+    <SupportedOSPlatformVersion Condition="'$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework)))' == 'ios'">15.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -30,8 +33,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
-    <!-- On-device text recognition (Google ML Kit) for scanning cards. -->
+    <!-- On-device text recognition for scanning photos (Google ML Kit on Android, Apple Vision on iOS). -->
     <PackageReference Include="Plugin.Maui.OCR" Version="1.1.1" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$([MSBuild]::GetTargetPlatformIdentifier($(TargetFramework)))' == 'android'">
     <!-- Live camera view for scanning (CameraX). 1.4.2.3 is built against the AndroidX Core 1.16 / Lifecycle 2.9.2
          that MAUI already brings in; newer CameraX releases would pull newer AndroidX versions. -->
     <PackageReference Include="Xamarin.AndroidX.Camera.Camera2" Version="1.4.2.3" />
