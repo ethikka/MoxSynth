@@ -14,6 +14,7 @@
         <ShellContent Route="home" Title="Home" Icon="tab_home.png" ContentTemplate="{DataTemplate pages:HomePage}" />
         <ShellContent Route="search" Title="Search" Icon="tab_search.png" ContentTemplate="{DataTemplate pages:SearchPage}" />
         <ShellContent Route="collection" Title="Collection" Icon="tab_collection.png" ContentTemplate="{DataTemplate pages:CollectionPage}" />
+        <ShellContent Route="decks" Title="Decks" Icon="tab_decks.png" ContentTemplate="{DataTemplate pages:DecksPage}" />
         <ShellContent Route="history" Title="History" Icon="tab_history.png" ContentTemplate="{DataTemplate pages:HistoryPage}" />
     </TabBar>
 </Shell>

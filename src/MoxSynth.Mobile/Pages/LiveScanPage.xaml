@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  Live card scanner, pushed modally by MlKitCardScanner. Always dark (not themed): the camera picture is the content.
+  The guide is sized in code (card shape); only text inside it is read.
+-->
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:MoxSynth.Mobile.Controls"
+             x:Class="MoxSynth.Mobile.Pages.LiveScanPage"
+             Shell.NavBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False"
+             Background="Black">
+    <ContentPage.Resources>
+        <Color x:Key="ScanLight">#F1EFE8</Color>
+        <Color x:Key="ScanState">#9FE1CB</Color>
+        <Color x:Key="ScanControl">#73000000</Color>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto,Auto">
+        <controls:CameraPreview x:Name="Preview" Grid.RowSpan="5" />
+
+        <!-- Close (left), torch (right; only when the camera has a flash unit). -->
+        <Grid Padding="16,16,16,0" ColumnDefinitions="Auto,*,Auto">
+            <Border WidthRequest="32" HeightRequest="32" StrokeThickness="0" StrokeShape="Ellipse"
+                    Background="{StaticResource ScanControl}" SemanticProperties.Description="Close the scanner">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnCloseTapped" />
+                </Border.GestureRecognizers>
+                <Path Data="M1,1 L11,11 M11,1 L1,11" WidthRequest="12" HeightRequest="12" Stroke="{StaticResource ScanLight}"
+                      StrokeThickness="2" StrokeLineCap="Round" HorizontalOptions="Center" VerticalOptions="Center" />
+            </Border>
+            <Border x:Name="TorchButton" Grid.Column="2" IsVisible="False" StrokeThickness="0" StrokeShape="RoundRectangle 16"
+                    Padding="14,6" Background="{StaticResource ScanControl}" VerticalOptions="Center"
+                    SemanticProperties.Description="Switch the torch on or off">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnTorchTapped" />
+                </Border.GestureRecognizers>
+                <Label Text="Torch" FontSize="13" TextColor="{StaticResource ScanLight}" />
+            </Border>
+        </Grid>
+
+        <!-- Card guide (63:88): a light outline, no dimming around it. -->
+        <Grid x:Name="GuideArea" Grid.Row="1">
+            <Border x:Name="Guide" Stroke="{StaticResource ScanLight}" StrokeThickness="2" StrokeShape="RoundRectangle 10"
+                    HorizontalOptions="Center" VerticalOptions="Center" />
+        </Grid>
+
+        <Label Grid.Row="2" Text="Hold the card inside the frame" FontSize="12" TextColor="{StaticResource ScanLight}"
+               HorizontalTextAlignment="Center" Margin="16,12,16,0" />
+        <!-- Reading… / Can't reach the server / Not recognised; keeps its height when empty so the guide doesn't move. -->
+        <Label x:Name="StateLabel" Grid.Row="3" FontSize="11" TextColor="{StaticResource ScanState}" MinimumHeightRequest="16"
+               HorizontalTextAlignment="Center" MaxLines="1" LineBreakMode="TailTruncation" Margin="16,4,16,0" />
+
+        <!-- Gallery (left), shutter (centre). -->
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto,*" Padding="24,16,24,32">
+            <Border WidthRequest="36" HeightRequest="36" StrokeThickness="0" StrokeShape="Ellipse"
+                    Background="{StaticResource ScanControl}" HorizontalOptions="Start" VerticalOptions="Center"
+                    SemanticProperties.Description="Scan a photo from the gallery">
+                <Border.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnGalleryTapped" />
+                </Border.GestureRecognizers>
+                <Image Source="gallery.png" WidthRequest="20" HeightRequest="20" />
+            </Border>
+            <Grid Grid.Column="1" WidthRequest="60" HeightRequest="60" SemanticProperties.Description="Read the card now">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="OnShutterTapped" />
+                </Grid.GestureRecognizers>
+                <Ellipse Stroke="White" StrokeThickness="3" />
+                <Ellipse Fill="White" Margin="7" />
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>

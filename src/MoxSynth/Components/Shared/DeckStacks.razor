@@ -1,0 +1,60 @@
+@using MoxSynth.Decks
+
+@if (_groups.Count == 0)
+{
+    <div class="alert alert-light">This deck is empty. Add cards with the box above, or import a list.</div>
+}
+else
+{
+    <div class="deck-stacks">
+        @foreach (var group in _groups)
+        {
+            <div class="deck-stack-column" @key="group.Key">
+                <div class="deck-stack-header @(group.Muted ? "deck-stack-muted" : "")">
+                    <span class="text-truncate">@group.Name</span>
+                    <span class="ms-auto deck-stack-count">@group.Quantity</span>
+                </div>
+                <div class="deck-stack">
+                    @foreach (var card in group.Cards)
+                    {
+                        var c = card;
+                        var image = c.ImageUrl ?? c.SmallImageUrl;
+                        <button type="button" @key="c.DeckCardId"
+                                class="deck-stack-card @(c.IllegalReason is not null ? "deck-stack-illegal" : "")"
+                                title="@(c.IllegalReason ?? c.Name)"
+                                aria-label="@($"{c.Quantity} × {c.Name}" + (c.IllegalReason is { } r ? $" ({r})" : ""))"
+                                @onclick="() => OnCardClick.InvokeAsync(c)">
+                            @if (image is not null)
+                            {
+                                <img class="deck-stack-image" src="@image" loading="lazy" alt="" />
+                            }
+                            else
+                            {
+                                <span class="deck-stack-placeholder">@c.Name</span>
+                            }
+                            @if (c.Quantity > 1)
+                            {
+                                <span class="deck-stack-qty">×@c.Quantity</span>
+                            }
+                            @if (c.OwnedAny == 0)
+                            {
+                                <span class="deck-stack-missing" title="Missing: not in your collection">Missing</span>
+                            }
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public DeckDetail? Deck { get; set; }
+    /// <summary>Same values as the editor's "Group by" (<see cref="DeckGrouping.ByCategory"/>, …).</summary>
+    [Parameter] public string GroupBy { get; set; } = DeckGrouping.ByCategory;
+    [Parameter] public EventCallback<DeckCardView> OnCardClick { get; set; }
+
+    private List<DeckCardGroup> _groups = [];
+
+    protected override void OnParametersSet() => _groups = DeckGrouping.Build(Deck, GroupBy);
+}

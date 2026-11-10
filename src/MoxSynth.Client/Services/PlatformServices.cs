@@ -40,7 +40,10 @@ public static class Routes
     public const string Search = "//main/search";
     public const string Collection = "//main/collection";
     public const string History = "//main/history";
+    public const string Decks = "//main/decks";
     public const string Card = "card";
+    /// <summary>A deck (parameter <c>id</c>), pushed on the Decks tab.</summary>
+    public const string Deck = "deck";
     public const string Settings = "settings";
 }
 
@@ -54,9 +57,39 @@ public interface IDialogs
     Task ToastAsync(string message);
 }
 
-/// <summary>Takes (or picks) a photo and runs on-device OCR on it.</summary>
+/// <summary>Puts text on the system clipboard (the decklist export).</summary>
+public interface IClipboardService
+{
+    Task SetTextAsync(string text);
+}
+
+/// <summary>Reads cards with on-device OCR: a live camera view, or a photo picked from the gallery.</summary>
 public interface ICardScanner
 {
+    /// <summary>Picks (gallery) or takes (camera app) a photo and runs on-device OCR on it.</summary>
     /// <returns>OCR lines with bounding boxes, or null when the user cancelled.</returns>
     Task<IReadOnlyList<OcrLineDto>?> ScanAsync(bool fromGallery, CancellationToken ct = default);
+
+    /// <summary>
+    /// Live camera view; calls <paramref name="recognize"/> for each readable frame until a card is found.
+    /// Returns the found result, <see cref="LiveScanOutcome.Gallery"/> when the user chose the gallery, or
+    /// <see cref="LiveScanOutcome.Cancelled"/>.
+    /// </summary>
+    Task<LiveScanResult> ScanLiveAsync(Func<IReadOnlyList<OcrLineDto>, CancellationToken, Task<RecognizeResultDto>> recognize,
+        CancellationToken ct = default);
+}
+
+public enum LiveScanOutcome
+{
+    Found,
+    Gallery,
+    Cancelled,
+}
+
+/// <summary>How a live scan ended; <see cref="Result"/> is set (and <c>Found</c>) only for <see cref="LiveScanOutcome.Found"/>.</summary>
+public sealed record LiveScanResult(LiveScanOutcome Outcome, RecognizeResultDto? Result = null)
+{
+    public static readonly LiveScanResult Gallery = new(LiveScanOutcome.Gallery);
+    public static readonly LiveScanResult Cancelled = new(LiveScanOutcome.Cancelled);
+    public static LiveScanResult Found(RecognizeResultDto result) => new(LiveScanOutcome.Found, result);
 }

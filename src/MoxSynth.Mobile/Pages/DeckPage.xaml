@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     x:Class="MoxSynth.Mobile.Pages.DeckPage"
+                     x:DataType="vm:DeckViewModel"
+                     Title="{Binding Title}">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Add card" Command="{Binding AddCardCommand}" />
+        <ToolbarItem Text="Copy decklist" Order="Secondary" Command="{Binding CopyDecklistCommand}" />
+    </ContentPage.ToolbarItems>
+
+    <Grid RowDefinitions="Auto,*">
+        <VerticalStackLayout Padding="14,0">
+            <ActivityIndicator IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="24" />
+            <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
+        </VerticalStackLayout>
+
+        <RefreshView Grid.Row="1" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+            <CollectionView ItemsSource="{Binding Groups}" IsGrouped="True">
+                <CollectionView.Header>
+                    <VerticalStackLayout Padding="12,8,12,0" Spacing="8" IsVisible="{Binding HasDeck}">
+                        <!-- Summary -->
+                        <Border Style="{StaticResource Card}">
+                            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="2">
+                                <Label Text="{Binding FormatText}" FontAttributes="Bold" />
+                                <Label Grid.Column="1" Text="{Binding ValueText}" Style="{StaticResource Price}" />
+                                <Label Grid.Row="1" Text="{Binding CountText}" Style="{StaticResource Muted}" />
+                                <Label Grid.Row="1" Grid.Column="1" Text="{Binding OwnedText}" Style="{StaticResource Muted}"
+                                       HorizontalTextAlignment="End" />
+                            </Grid>
+                        </Border>
+
+                        <!-- Legality -->
+                        <Label Text="{Binding LegalityText}" TextColor="{DynamicResource ThemeOk}" IsVisible="{Binding IsLegal}" />
+                        <Label Text="{Binding LegalityText}" TextColor="{DynamicResource ThemeBad}" IsVisible="{Binding IsNotLegal}">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ShowProblemsCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+
+                        <!-- Stats -->
+                        <Label Text="{Binding StatsToggleText}" Style="{StaticResource Link}" Padding="0,4">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ToggleStatsCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                        <VerticalStackLayout IsVisible="{Binding ShowStats}" Spacing="6">
+                            <!-- Mana curve 0 … 6+ (counting cards, no lands) -->
+                            <Grid ColumnDefinitions="*,*,*,*,*,*,*" ColumnSpacing="6" BindableLayout.ItemsSource="{Binding Stats.Curve}">
+                                <BindableLayout.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ManaCurveBar">
+                                        <Grid Grid.Column="{Binding Column}" RowDefinitions="100,Auto">
+                                            <VerticalStackLayout VerticalOptions="End" Spacing="2">
+                                                <Label Text="{Binding Count}" Style="{StaticResource Muted}" HorizontalTextAlignment="Center" />
+                                                <BoxView HeightRequest="{Binding BarHeight}" Color="{DynamicResource ThemeAccent}" CornerRadius="2" />
+                                            </VerticalStackLayout>
+                                            <Label Grid.Row="1" Text="{Binding Label}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </BindableLayout.ItemTemplate>
+                            </Grid>
+                            <Label Text="{Binding Stats.ColorsText}" />
+                            <Label Text="{Binding Stats.TypesText}" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </CollectionView.Header>
+
+                <CollectionView.GroupHeaderTemplate>
+                    <DataTemplate x:DataType="vm:DeckCardGroup">
+                        <Grid ColumnDefinitions="*,Auto" Padding="16,12,16,2">
+                            <Label Text="{Binding Name}" FontAttributes="Bold">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsNotCounting}" Value="True">
+                                        <Setter Property="TextColor" Value="{DynamicResource ThemeMuted}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                            <Label Grid.Column="1" Text="{Binding CardCount}" FontAttributes="Bold">
+                                <Label.Triggers>
+                                    <DataTrigger TargetType="Label" Binding="{Binding IsNotCounting}" Value="True">
+                                        <Setter Property="TextColor" Value="{DynamicResource ThemeMuted}" />
+                                    </DataTrigger>
+                                </Label.Triggers>
+                            </Label>
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.GroupHeaderTemplate>
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DeckCardItem">
+                        <Border Style="{StaticResource Row}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnCardTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="40,*,Auto,Auto" ColumnSpacing="6">
+                                <Image Source="{Binding ImageUrl}" WidthRequest="40" HeightRequest="56" Aspect="AspectFit" />
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
+                                    <Label LineBreakMode="TailTruncation">
+                                        <Label.FormattedText>
+                                            <FormattedString>
+                                                <Span Text="{Binding Name}" FontAttributes="Bold" />
+                                                <Span Text="{Binding SetCode}" FontSize="12" TextColor="{DynamicResource ThemeMuted}" />
+                                            </FormattedString>
+                                        </Label.FormattedText>
+                                    </Label>
+                                    <Label FormattedText="{Binding ManaCost, Converter={StaticResource ManaCost}}"
+                                           IsVisible="{Binding ManaCost, Converter={StaticResource IsNotNull}}" />
+                                    <HorizontalStackLayout Spacing="6">
+                                        <Label Text="{Binding PriceText}" FontSize="12"
+                                               IsVisible="{Binding PriceText, Converter={StaticResource IsNotNull}}" />
+                                        <Label Text="Owned" FontSize="12" TextColor="{DynamicResource ThemeOk}" IsVisible="{Binding IsOwned}" />
+                                        <Label Text="{Binding PartlyOwnedText}" FontSize="12" TextColor="{DynamicResource ThemeMuted}"
+                                               IsVisible="{Binding IsPartlyOwned}" />
+                                        <Label Text="Missing" FontSize="12" TextColor="{DynamicResource ThemeBad}" IsVisible="{Binding IsMissing}" />
+                                        <Label Text="⚠" FontSize="12" TextColor="{DynamicResource ThemeBad}" Padding="4,0"
+                                               IsVisible="{Binding IsIllegal}">
+                                            <Label.GestureRecognizers>
+                                                <TapGestureRecognizer Tapped="OnIllegalTapped" />
+                                            </Label.GestureRecognizers>
+                                        </Label>
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                                <HorizontalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="2">
+                                    <Button Text="−" Style="{StaticResource Small}" WidthRequest="32" Clicked="OnDecrementClicked" />
+                                    <Label Text="{Binding Quantity}" FontAttributes="Bold" VerticalOptions="Center"
+                                           MinimumWidthRequest="22" HorizontalTextAlignment="Center" />
+                                    <Button Text="+" Style="{StaticResource Small}" WidthRequest="32" Clicked="OnIncrementClicked" />
+                                </HorizontalStackLayout>
+                                <Button Grid.Column="3" Text="⋯" Style="{StaticResource Small}" WidthRequest="28" BorderWidth="0"
+                                        VerticalOptions="Center" Clicked="OnMenuClicked" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+
+                <CollectionView.EmptyView>
+                    <Label Text="No cards in this deck yet." Style="{StaticResource Muted}"
+                           HorizontalTextAlignment="Center" Padding="30" IsVisible="{Binding HasDeck}" />
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</pages:ViewModelPage>

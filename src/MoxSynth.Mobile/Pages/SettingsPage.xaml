@@ -27,16 +27,19 @@
             </Border>
 
             <Border Style="{StaticResource Card}">
-                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
-                    <Label Text="Signed in as" Style="{StaticResource Muted}" />
-                    <Label Grid.Column="1" Text="{Binding ProfileName}" FontAttributes="Bold" />
-                    <Label Grid.Row="1" Text="Server" Style="{StaticResource Muted}" />
-                    <Label Grid.Row="1" Grid.Column="1" Text="{Binding ServerUrl}" />
-                    <Label Grid.Row="2" Text="Card database" Style="{StaticResource Muted}" />
-                    <Label Grid.Row="2" Grid.Column="1" Text="{Binding CardDatabase}" />
-                    <Label Grid.Row="3" Text="Prices updated" Style="{StaticResource Muted}" />
-                    <Label Grid.Row="3" Grid.Column="1" Text="{Binding PricesDate}" />
-                </Grid>
+                <VerticalStackLayout Spacing="10">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="6">
+                        <Label Text="Signed in as" Style="{StaticResource Muted}" />
+                        <Label Grid.Column="1" Text="{Binding ProfileName}" FontAttributes="Bold" />
+                        <Label Grid.Row="1" Text="Server" Style="{StaticResource Muted}" />
+                        <Label Grid.Row="1" Grid.Column="1" Text="{Binding ServerUrl}" />
+                        <Label Grid.Row="2" Text="Card database" Style="{StaticResource Muted}" />
+                        <Label Grid.Row="2" Grid.Column="1" Text="{Binding CardDatabase}" />
+                        <Label Grid.Row="3" Text="Prices updated" Style="{StaticResource Muted}" />
+                        <Label Grid.Row="3" Grid.Column="1" Text="{Binding PricesDate}" />
+                    </Grid>
+                    <Button Text="Change server" Command="{Binding ChangeServerCommand}" Style="{StaticResource Secondary}" />
+                </VerticalStackLayout>
             </Border>
 
             <Button Text="Sign out" Command="{Binding SignOutCommand}" Style="{StaticResource Danger}" />

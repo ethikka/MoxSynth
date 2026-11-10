@@ -1,0 +1,123 @@
+@using MoxSynth.Decks
+
+@if (Deck is not null)
+{
+    var counted = DeckGrouping.CountedCards(Deck).ToList();
+    var nonLand = counted.Where(c => DeckGrouping.PrimaryType(c) != DeckGrouping.LandType).ToList();
+
+    var curve = new int[DeckGrouping.MaxManaValueGroup + 1];
+    foreach (var card in nonLand) curve[DeckGrouping.ManaValueBucket(card)] += card.Quantity;
+    var curveMax = Math.Max(1, curve.Max());
+
+    var colorCounts = Colors.ToDictionary(c => c.Code, _ => 0);
+    foreach (var card in counted)
+    {
+        var known = card.Colors.Where(colorCounts.ContainsKey).Distinct().ToList();
+        if (known.Count > 0) foreach (var code in known) colorCounts[code] += card.Quantity;
+        else if (DeckGrouping.PrimaryType(card) != DeckGrouping.LandType) colorCounts["C"] += card.Quantity;
+    }
+    var colorMax = Math.Max(1, colorCounts.Values.Max());
+
+    var typeCounts = counted.GroupBy(DeckGrouping.PrimaryType).ToDictionary(g => g.Key, g => g.Sum(c => c.Quantity));
+    var expensive = counted.Where(c => c.Price is > 0)
+        .OrderByDescending(c => c.Price)
+        .DistinctBy(c => c.Name)
+        .Take(3)
+        .ToList();
+
+    <div class="deck-stats">
+        <section>
+            <h6 class="deck-stats-heading">Mana curve</h6>
+            <div class="deck-curve" role="img" aria-label="@CurveLabel(curve)">
+                @for (var i = 0; i < curve.Length; i++)
+                {
+                    var count = curve[i];
+                    <div class="deck-curve-col">
+                        <span class="deck-curve-count">@(count > 0 ? count : "")</span>
+                        <div class="deck-curve-track">
+                            <div class="deck-curve-bar" style="height: @Percent(count, curveMax)"></div>
+                        </div>
+                        <span class="deck-curve-label">@DeckGrouping.ManaValueLabel(i)</span>
+                    </div>
+                }
+            </div>
+        </section>
+
+        @if (colorCounts.Values.Any(v => v > 0))
+        {
+            <section>
+                <h6 class="deck-stats-heading">Colors</h6>
+                @foreach (var color in Colors.Where(c => colorCounts[c.Code] > 0))
+                {
+                    var count = colorCounts[color.Code];
+                    <div class="deck-color-row">
+                        <span class="deck-color-dot deck-color-@color.Code.ToLowerInvariant()" aria-hidden="true"></span>
+                        <span class="deck-color-name">@color.Name</span>
+                        <span class="deck-color-track"><span class="deck-color-bar" style="width: @Percent(count, colorMax)"></span></span>
+                        <span class="deck-stats-num">@count</span>
+                    </div>
+                }
+            </section>
+        }
+
+        @if (typeCounts.Count > 0)
+        {
+            <section>
+                <h6 class="deck-stats-heading">Types</h6>
+                <ul class="list-unstyled mb-0">
+                    @foreach (var type in TypeOrder.Where(t => typeCounts.GetValueOrDefault(t) > 0))
+                    {
+                        <li class="d-flex justify-content-between"><span>@type</span><span class="deck-stats-num">@typeCounts[type]</span></li>
+                    }
+                </ul>
+            </section>
+        }
+
+        <section>
+            <h6 class="deck-stats-heading">Price</h6>
+            @if (Deck.Value is { } value)
+            {
+                <div class="deck-stats-total">@Format(value)</div>
+                @if (expensive.Count > 0)
+                {
+                    <ul class="list-unstyled mb-0 small">
+                        @foreach (var card in expensive)
+                        {
+                            <li class="d-flex gap-2">
+                                <span class="text-truncate" title="@card.Name">@card.Name</span>
+                                <span class="ms-auto text-body-secondary deck-stats-num text-nowrap">@Format(card.Price!.Value)</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            }
+            else
+            {
+                <div class="small text-body-secondary">No prices</div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public DeckDetail? Deck { get; set; }
+
+    private sealed record ColorInfo(string Code, string Name);
+
+    private static readonly ColorInfo[] Colors =
+    [
+        new("W", "White"), new("U", "Blue"), new("B", "Black"), new("R", "Red"), new("G", "Green"), new("C", "Colorless"),
+    ];
+
+    /// <summary>Same order as the deck's type categories.</summary>
+    private static readonly string[] TypeOrder = [.. DeckGrouping.TypePrecedence, DeckGrouping.OtherType];
+
+    private static string Percent(int count, int max) =>
+        (100.0 * count / max).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
+
+    private static string CurveLabel(int[] curve) =>
+        "Mana curve: " + string.Join(", ", curve.Select((n, i) => $"{DeckGrouping.ManaValueLabel(i)}: {n}"));
+
+    private string Format(double value) =>
+        PriceProviders.CurrencySymbol(Deck?.Currency) + value.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
+}

@@ -5,6 +5,7 @@ using MoxSynth.Api;
 using MoxSynth.Cards;
 using MoxSynth.Collection;
 using MoxSynth.Components;
+using MoxSynth.Decks;
 using MoxSynth.Infrastructure;
 using MoxSynth.Prices;
 using MoxSynth.Profiles;
@@ -55,6 +56,13 @@ builder.Services.AddScoped<PriceSettings>();
 builder.Services.AddSingleton<ProfileStore>();
 builder.Services.AddScoped<CurrentProfile>();
 builder.Services.AddScoped<CollectionRepository>(); // per circuit: uses the current profile's database
+builder.Services.AddScoped<DeckRepository>();       // per circuit: decks live in the current profile's database too
+builder.Services.AddHttpClient<ArchidektDeckImport>(client => // public Archidekt deck API (Decks/ArchidektDeckImport.cs)
+{
+    client.Timeout = ArchidektDeckImport.Timeout;
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(ArchidektDeckImport.UserAgent);
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+});
 
 var app = builder.Build();
 

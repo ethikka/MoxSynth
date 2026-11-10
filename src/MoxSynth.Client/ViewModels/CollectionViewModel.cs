@@ -17,6 +17,8 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
     private int _totalPages;
     private bool _loaded;
     private string? _loadedProvider;
+    private bool _subscribed;
+    private bool _resetting;
 
     [ObservableProperty]
     private string _query = "";
@@ -58,6 +60,8 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
     /// <summary>Reloads when shown (cards may have been added elsewhere) – keeps the list while loading.</summary>
     public override Task OnAppearingAsync()
     {
+        if (!_subscribed) session.SignedOut += OnSignedOut;
+        _subscribed = true;
         Schedule(TimeSpan.Zero, showBusy: !_loaded || _loadedProvider != session.Provider);
         return PendingLoad!;
     }
@@ -69,8 +73,30 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
         return PendingLoad!;
     }
 
+    /// <summary>Back to the first-launch state so the next account never sees this one's collection.</summary>
+    private void OnSignedOut()
+    {
+        _searchCts?.Cancel();
+        _searchCts = null;
+        PendingLoad = null;
+        _resetting = true; // the property resets below must not schedule loads
+        Query = "";
+        Scryfall = "";
+        SelectedSort = CardVocabulary.CollectionSorts[0];
+        ShowRemoved = false;
+        _resetting = false;
+        ShowScryfall = false;
+        Summary = "";
+        Groups.Clear();
+        _page = _totalPages = 0;
+        _loaded = false;
+        _loadedProvider = null;
+        Error = null;
+    }
+
     private void Schedule(TimeSpan delay, bool showBusy = true)
     {
+        if (_resetting) return;
         _searchCts?.Cancel();
         var cts = _searchCts = new CancellationTokenSource();
         PendingLoad = LoadAsync(delay, showBusy, cts.Token);

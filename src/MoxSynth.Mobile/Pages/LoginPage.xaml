@@ -18,10 +18,22 @@
                     <Label Style="{StaticResource Muted}"
                            Text="Address of the computer running MoxSynth on your Wi-Fi – moxsynth:5180 unless you changed it, or its IP address, e.g. 192.168.1.20:5180" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                        <Entry Text="{Binding ServerUrl}" Placeholder="moxsynth:5180" Keyboard="Url"
+                        <Entry x:Name="ServerEntry" Text="{Binding ServerUrl}" Placeholder="moxsynth:5180" Keyboard="Url"
                                ReturnCommand="{Binding ConnectCommand}" />
                         <Button Grid.Column="1" Text="Connect" Command="{Binding ConnectCommand}" Style="{StaticResource Secondary}" />
                     </Grid>
+                    <VerticalStackLayout Spacing="4" IsVisible="{Binding HasRecentServers}">
+                        <Label Text="Recent" Style="{StaticResource Muted}" />
+                        <FlexLayout BindableLayout.ItemsSource="{Binding RecentServers}" Wrap="Wrap" JustifyContent="Start">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Button Style="{StaticResource Small}" Text="{Binding .}" Margin="0,0,6,6"
+                                            Command="{Binding UseRecentServerCommand, Source={RelativeSource AncestorType={x:Type vm:LoginViewModel}}}"
+                                            CommandParameter="{Binding .}" />
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </FlexLayout>
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
             </Border>
 

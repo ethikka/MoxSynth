@@ -14,16 +14,31 @@
         <ToolbarItem Text="Clear" Order="Secondary" Command="{Binding ClearCommand}" />
     </ContentPage.ToolbarItems>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,*">
+        <!-- "Adding to <deck>" mode (from the deck page): "+" and scans add to that deck; ✕ ends it. -->
+        <Border IsVisible="{Binding IsAddingToDeck}" BackgroundColor="{DynamicResource ThemeSurface2}"
+                Stroke="{DynamicResource ThemeAccent}" StrokeThickness="1" StrokeShape="RoundRectangle 8"
+                Padding="12,6" Margin="12,6,12,2">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <Label Text="{Binding AddingToDeckText}" FontAttributes="Bold" VerticalOptions="Center"
+                       LineBreakMode="TailTruncation" />
+                <Label Grid.Column="1" Text="✕" FontSize="18" Padding="8,0" VerticalOptions="Center"
+                       TextColor="{DynamicResource ThemeLink}">
+                    <Label.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding StopAddingToDeckCommand}" />
+                    </Label.GestureRecognizers>
+                </Label>
+            </Grid>
+        </Border>
         <!-- Words = parts of the name, a number = collector number ("bolt 146"). -->
-        <SearchBar Text="{Binding Query}" Placeholder="Name or collector number" />
-        <SearchBar Grid.Row="1" Text="{Binding Scryfall}" Placeholder="Scryfall syntax, e.g. t:creature c:g pow&gt;=4"
+        <SearchBar Grid.Row="1" Text="{Binding Query}" Placeholder="Name or collector number" />
+        <SearchBar Grid.Row="2" Text="{Binding Scryfall}" Placeholder="Scryfall syntax, e.g. t:creature c:g pow&gt;=4"
                    IsVisible="{Binding ShowScryfall}" FontFamily="monospace" FontSize="13" />
-        <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Padding="14,2">
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Padding="14,2">
             <Label Text="{Binding ResultText}" Style="{StaticResource Muted}" VerticalOptions="Center" />
             <ActivityIndicator Grid.Column="1" IsRunning="{Binding IsBusy}" IsVisible="{Binding IsBusy}" HeightRequest="20" />
         </Grid>
-        <VerticalStackLayout Grid.Row="3" Padding="14,0">
+        <VerticalStackLayout Grid.Row="4" Padding="14,0">
             <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" />
             <HorizontalStackLayout IsVisible="{Binding IsScanning}" Spacing="8">
                 <ActivityIndicator IsRunning="True" HeightRequest="20" />
@@ -31,7 +46,7 @@
             </HorizontalStackLayout>
         </VerticalStackLayout>
 
-        <CollectionView Grid.Row="4" ItemsSource="{Binding Results}" RemainingItemsThreshold="5"
+        <CollectionView Grid.Row="5" ItemsSource="{Binding Results}" RemainingItemsThreshold="5"
                         RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}">
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:CardItem">
