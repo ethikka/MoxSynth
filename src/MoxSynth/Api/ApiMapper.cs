@@ -113,11 +113,12 @@ internal static class ApiMapper
                 g.Language, g.Quantity, g.FirstAddedAt, g.LastAddedAt, summary?.ManaCost,
                 ScryfallImages.Url(summary?.ScryfallId, "small"),
                 price is null ? null : ToDto(price, withHistory: true, withStats: false),
-                price is null ? null : Math.Round(price.Price * g.Quantity, 2));
+                price is null ? null : Math.Round(price.Price * g.Quantity, 2),
+                g.IsRemoved, g.LastRemovedAt, g.RemovalReasons);
         }).ToList();
 
         return new CollectionPageDto(
             new PageDto<CollectionGroupDto>(items, page.Groups.TotalCount, page.Groups.Page, page.Groups.PageSize),
-            page.TotalCopies, page.TotalValue, page.Currency, page.UnpricedCopies);
+            page.TotalCopies, page.TotalValue, page.Currency, page.UnpricedCopies, page.RemovedCopies);
     }
 }

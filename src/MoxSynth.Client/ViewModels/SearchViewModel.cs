@@ -170,7 +170,10 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
             ShowCandidates(result);
             var printing = result.SetCode is not null && result.Number is not null ? $" ({result.SetCode} #{result.Number})" : "";
             if (result.Candidates.Count == 1)
-                await OpenCardAsync(Results[0]);
+            {
+                if (Results[0].IsOwned) await HandleOwnedScanAsync(Results[0]);
+                else await OpenCardAsync(Results[0]);
+            }
             else
                 await dialogs.ToastAsync($"Recognised {result.Name}{printing} – pick the printing");
         }
@@ -182,6 +185,77 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
         {
             IsScanning = false;
         }
+    }
+
+    private const string AddCopyOption = "Add a new copy";
+    private const string RemoveCopyOption = "Remove an existing copy";
+    private const string OpenCardOption = "Just show the card";
+
+    /// <summary>The scanned printing is already in the collection: add another copy, remove one, or just open it.</summary>
+    private async Task HandleOwnedScanAsync(CardItem item)
+    {
+        var choice = await dialogs.ChooseAsync($"You already own {item.Owned}× {item.Name} ({item.Card.SetCode} #{item.Card.Number})",
+            [AddCopyOption, RemoveCopyOption, OpenCardOption]);
+        switch (choice)
+        {
+            case AddCopyOption:
+                await QuickAddAsync(item);
+                break;
+            case RemoveCopyOption:
+                await RemoveScannedCopyAsync(item);
+                break;
+            case OpenCardOption:
+                await OpenCardAsync(item);
+                break;
+        }
+    }
+
+    /// <summary>Lets the user pick which owned copy of the printing leaves the collection, and why.</summary>
+    private async Task RemoveScannedCopyAsync(CardItem item)
+    {
+        CardDetailDto? card = null;
+        if (!await RunAsync(async () => card = await api.GetCardAsync(item.Card.Uuid, session.Provider))) return;
+
+        var owned = card!.Copies.Where(c => c.RemovedAt is null).ToList();
+        if (owned.Count == 0)
+        {
+            item.Owned = 0;
+            await dialogs.AlertAsync("Nothing to remove", $"There is no copy of {item.Name} left in your collection.");
+            return;
+        }
+
+        var copy = owned[0];
+        if (owned.Count > 1)
+        {
+            // Numbered so identical copies still get distinct options.
+            var labels = owned.Select((c, i) => $"{i + 1}. {DescribeCopy(c)}").ToList();
+            var chosen = await dialogs.ChooseAsync($"Which copy of {item.Name}?", labels);
+            if (chosen is null) return;
+            copy = owned[labels.IndexOf(chosen)];
+        }
+
+        var reason = await dialogs.ChooseAsync("Why is this copy leaving?", CardVocabulary.RemovalReasons);
+        if (reason is null) return;
+
+        await RunAsync(async () =>
+        {
+            await api.RemoveCopyAsync(copy.Id, reason);
+            item.Owned = owned.Count - 1;
+            await dialogs.ToastAsync($"Removed {item.Name} ({CardVocabulary.FinishLabel(copy.Finish)}, {CardVocabulary.ConditionShort(copy.Condition)}) – {reason}");
+        }, showBusy: false);
+    }
+
+    private static string DescribeCopy(CopyDto c)
+    {
+        var parts = new List<string>
+        {
+            CardVocabulary.FinishLabel(c.Finish),
+            CardVocabulary.ConditionShort(c.Condition),
+            c.Language,
+            $"added {c.AddedAt.ToLocalTime():d MMM yyyy}",
+        };
+        if (c.PurchasePrice is { } price) parts.Add(price.ToString("0.00", System.Globalization.CultureInfo.CurrentCulture));
+        return string.Join(" · ", parts);
     }
 
     private void ShowCandidates(RecognizeResultDto result)

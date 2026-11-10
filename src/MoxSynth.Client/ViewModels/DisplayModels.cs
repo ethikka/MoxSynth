@@ -88,9 +88,18 @@ public sealed partial class GroupItem(CollectionGroupDto group) : ObservableObje
         $"{Group.SetCode} #{Group.Number} · {CardVocabulary.FinishLabel(Group.Finish)} · {CardVocabulary.ConditionShort(Group.Condition)}" +
         (Group.Language == "English" ? "" : " · " + Group.Language);
 
+    public bool IsRemoved => Group.IsRemoved;
+    public bool IsOwned => !Group.IsRemoved;
+
+    /// <summary>"Removed 10 Nov 2026 09:40 · Sold, Traded" for a removed group.</summary>
+    public string? RemovedText => Group.IsRemoved
+        ? "Removed" + (Group.LastRemovedAt is { } at ? " " + Format.LocalDateTime(at) : "") +
+          (Group.RemovalReasons is { Length: > 0 } r ? " · " + r.Replace(",", ", ") : "")
+        : null;
+
     public PriceView? Price { get; } = PriceView.From(group.Price);
 
-    public string? ValueText => Group.Price is { } p && Quantity > 1 ? "= " + CardVocabulary.FormatPrice(p.Currency, p.Price * Quantity) : null;
+    public string? ValueText => !Group.IsRemoved && Group.Price is { } p && Quantity > 1 ? "= " + CardVocabulary.FormatPrice(p.Currency, p.Price * Quantity) : null;
 }
 
 public sealed record HistoryItem(HistoryEventDto Event)

@@ -78,6 +78,10 @@ else
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
         <span class="text-muted small">
             @_page.TotalCopies.ToString("N0") cards in @_page.Groups.TotalCount.ToString("N0") groups
+            @if (_page.RemovedCopies > 0)
+            {
+                <span>(incl. @_page.RemovedCopies.ToString("N0") removed, not counted)</span>
+            }
             @if (_query.AsOf is not null)
             {
                 <span class="badge text-bg-info gap-start-2">Historic view: @SqliteTime.Display(_query.AsOf) (read-only, current prices)</span>
@@ -93,9 +97,14 @@ else
                 }
             </span>
         }
+        <div class="form-check form-switch ms-auto mb-0" title="@(_query.AsOf is null ? "List removed copies too (greyed out)" : "Not available in the historic view")">
+            <input class="form-check-input" type="checkbox" role="switch" id="showRemoved"
+                   @bind="_query.IncludeRemoved" @bind:after="SearchAsync" disabled="@(_query.AsOf is not null)" />
+            <label class="form-check-label small" for="showRemoved">Show removed cards</label>
+        </div>
         @if (Prices.IsAvailable)
         {
-            <div class="ms-auto d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
                 <label class="small text-body-secondary" for="sort">Sort</label>
                 <select id="sort" class="form-select form-select-sm w-auto" @bind="_query.Sort" @bind:after="SearchAsync">
                     <option value="@CollectionSort.Name">Name</option>
@@ -138,7 +147,7 @@ else
                 @foreach (var g in _page.Groups.Items)
                 {
                     var info = _cardInfo.GetValueOrDefault(g.CardUuid);
-                    <tr>
+                    <tr class="@(g.IsRemoved ? "collection-removed" : "")">
                         <td>
                             @if (ScryfallImages.Url(info?.ScryfallId, "small") is { } img)
                             {
@@ -163,7 +172,7 @@ else
                             var price = _prices.GetValueOrDefault(g.CardUuid)?.GetValueOrDefault(g.Finish);
                             <td class="small"><PriceTrend Price="price" /></td>
                             <td class="small text-end">
-                                @if (price is not null)
+                                @if (price is not null && !g.IsRemoved)
                                 {
                                     @price.Format(price.Price * g.Quantity)
                                 }
@@ -171,7 +180,17 @@ else
                         }
                         <td class="small text-muted">@SqliteTime.Display(g.LastAddedAt)</td>
                         <td class="text-end text-nowrap">
-                            @if (_query.AsOf is null)
+                            @if (g.IsRemoved)
+                            {
+                                <span class="badge text-bg-secondary" title="@g.RemovalReasons?.Replace(",", ", ")">
+                                    Removed @SqliteTime.Display(g.LastRemovedAt)
+                                </span>
+                                @if (!string.IsNullOrEmpty(g.RemovalReasons))
+                                {
+                                    <div class="small text-muted">@g.RemovalReasons.Replace(",", ", ")</div>
+                                }
+                            }
+                            else if (_query.AsOf is null)
                             {
                                 <button class="btn btn-outline-secondary btn-sm py-0" title="Remove one copy (oldest first)"
                                         @onclick="() => RemoveOneAsync(g)">−1</button>
@@ -273,6 +292,7 @@ else
         _query.Scryfall = null;
         _query.AsOf = null;
         _asOfLocal = null;
+        _query.IncludeRemoved = false;
         _query.Page = 1;
         await LoadAsync();
     }

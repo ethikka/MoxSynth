@@ -133,27 +133,67 @@
         }
     }
 
+    // The chosen camera is remembered per browser; storage can be unavailable (private mode), so never fail on it.
+    const CAMERA_KEY = 'moxScanner.camera';
+    function loadCamera() {
+        try { return localStorage.getItem(CAMERA_KEY); } catch { return null; }
+    }
+    function saveCamera(id) {
+        try { id ? localStorage.setItem(CAMERA_KEY, id) : localStorage.removeItem(CAMERA_KEY); } catch { }
+    }
+
     window.moxScanner = {
         isCameraAvailable: () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) && window.isSecureContext,
 
-        /** Starts the camera and scans continuously. Returns an error message or null. */
-        start: async function (video, guide, dotnet) {
+        /**
+         * Starts the camera and scans continuously. Returns an error message or null.
+         * Uses <deviceId> when given (and remembers it), else the camera used last time, else the back camera.
+         */
+        start: async function (video, guide, dotnet, deviceId) {
             this.stop();
             const mySession = ++session;
+            if (deviceId) saveCamera(deviceId);
+            const wanted = deviceId || loadCamera();
+            const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
             try {
-                stream = await navigator.mediaDevices.getUserMedia({
-                    audio: false,
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
-                });
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: false,
+                        video: wanted ? { deviceId: { exact: wanted }, ...size } : { facingMode: { ideal: 'environment' }, ...size },
+                    });
+                } catch (e) {
+                    if (!wanted || (e && e.name === 'NotAllowedError')) throw e;
+                    // The remembered camera is gone (unplugged, other device): forget it and use the default.
+                    saveCamera(null);
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: false,
+                        video: { facingMode: { ideal: 'environment' }, ...size },
+                    });
+                }
             } catch (e) {
                 return e && e.name === 'NotAllowedError' ? 'Camera access was denied.' : 'No camera available (' + (e && e.message || e) + ').';
             }
+            if (mySession !== session) { stream.getTracks().forEach(t => t.stop()); return null; }
             video.srcObject = stream;
             await video.play();
             positionGuide(video, guide);
             ensureWorker().catch(() => { }); // warm up while the user positions the card
             timer = setInterval(() => scanVideoFrame(video, dotnet, mySession), 700);
             return null;
+        },
+
+        /**
+         * The cameras to choose from and the one in use: { current, cameras: [{ id, label }] }.
+         * Labels are only filled in once camera access was granted, so call this after start().
+         */
+        cameras: async function () {
+            const devices = navigator.mediaDevices && navigator.mediaDevices.enumerateDevices
+                ? await navigator.mediaDevices.enumerateDevices() : [];
+            const cameras = devices.filter(d => d.kind === 'videoinput' && d.deviceId)
+                .map((d, i) => ({ id: d.deviceId, label: d.label || ('Camera ' + (i + 1)) }));
+            const track = stream && stream.getVideoTracks()[0];
+            const current = (track && track.getSettings && track.getSettings().deviceId) || null;
+            return { current, cameras };
         },
 
         /** One immediate scan of the current frame (button). */

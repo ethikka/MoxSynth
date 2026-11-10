@@ -1,0 +1,143 @@
+@inject CollectionRepository Collection
+
+@* Shown after a scan matched a printing that is already in the collection: add another copy, or remove one. *@
+@if (_card is not null)
+{
+    <div class="scanner-backdrop" @onclick="Close">
+        <div class="card scanner-dialog" @onclick:stopPropagation="true">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Already in your collection</strong>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="Close"></button>
+            </div>
+            <div class="card-body">
+                <p class="mb-3">
+                    You own <strong>@_copies.Count</strong> @(_copies.Count == 1 ? "copy" : "copies") of
+                    <a href="card/@_card.Uuid">@_card.Name</a>
+                    <span class="text-muted">(@_card.SetCode #@_card.Number)</span>.
+                </p>
+
+                <h2 class="h6">Add a new copy (Near Mint)</h2>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    @foreach (var finish in _card.FinishList)
+                    {
+                        var f = finish;
+                        <button type="button" class="btn btn-primary btn-sm" disabled="@_busy" @onclick="() => AddAsync(f)">
+                            + @CardFinishes.Label(f)
+                        </button>
+                    }
+                </div>
+
+                <h2 class="h6">Or remove an existing copy</h2>
+                <table class="table table-sm mb-0 small">
+                    <thead>
+                        <tr><th>Added</th><th>Finish</th><th>Cond.</th><th>Lang</th><th>Price</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var copy in _copies)
+                        {
+                            <tr title="@copy.Notes">
+                                <td>@SqliteTime.Display(copy.AddedAt)</td>
+                                <td>@CardFinishes.Label(copy.Finish)</td>
+                                <td>@copy.Condition.Short()</td>
+                                <td>@copy.Language</td>
+                                <td>@(copy.PurchasePrice?.ToString("0.00"))</td>
+                                <td class="text-end">
+                                    <button class="btn btn-outline-danger btn-sm py-0" disabled="@_busy"
+                                            @onclick="() => _removingId = copy.Id">Remove</button>
+                                </td>
+                            </tr>
+                            @if (_removingId == copy.Id)
+                            {
+                                <tr class="table-warning">
+                                    <td colspan="6">
+                                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                                            <span>Reason:</span>
+                                            <select class="form-select form-select-sm w-auto" @bind="_removalReason">
+                                                @foreach (var r in RemovalReasons.All)
+                                                {
+                                                    <option value="@r">@r</option>
+                                                }
+                                            </select>
+                                            <button class="btn btn-danger btn-sm" disabled="@_busy" @onclick="() => RemoveAsync(copy)">Confirm removal</button>
+                                            <button class="btn btn-link btn-sm" @onclick="() => _removingId = null">Cancel</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-end">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="Close">Just show it</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Raised after a copy was added or removed: message for a toast, toast kind, and the new owned count.</summary>
+    [Parameter] public EventCallback<(string Message, string Kind, string CardUuid, long Owned)> OnChanged { get; set; }
+
+    private CardSummary? _card;
+    private IReadOnlyList<CollectionCard> _copies = [];
+    private long? _removingId;
+    private string _removalReason = RemovalReasons.All[0];
+    private bool _busy;
+
+    /// <summary>Opens the dialog when <paramref name="card"/> is owned; returns false (and stays closed) otherwise.</summary>
+    public async Task<bool> ShowIfOwnedAsync(CardSummary card)
+    {
+        var copies = await Collection.GetCopiesAsync(card.Uuid, includeRemoved: false);
+        if (copies.Count == 0) return false;
+
+        _card = card;
+        _copies = copies;
+        _removingId = null;
+        _removalReason = RemovalReasons.All[0];
+        _busy = false;
+        StateHasChanged();
+        return true;
+    }
+
+    private async Task AddAsync(string finish)
+    {
+        if (_card is not { } card) return;
+        _busy = true;
+        await Collection.AddAsync(new AddCardsRequest
+        {
+            CardUuid = card.Uuid,
+            Name = card.Name,
+            SetCode = card.SetCode,
+            Number = card.Number,
+            Finish = finish,
+            Language = card.Language ?? "English",
+        });
+        await FinishAsync($"Added {card.Name} ({card.SetCode} #{card.Number}, {CardFinishes.Label(finish)})", "success", _copies.Count + 1);
+    }
+
+    private async Task RemoveAsync(CollectionCard copy)
+    {
+        if (_card is not { } card) return;
+        _busy = true;
+        var removed = await Collection.RemoveAsync(copy.Id, _removalReason);
+        await FinishAsync(removed
+                ? $"Removed {card.Name} ({CardFinishes.Label(copy.Finish)}, {copy.Condition.Short()}) – {_removalReason}"
+                : "That copy was already removed.",
+            "secondary", _copies.Count - (removed ? 1 : 0));
+    }
+
+    private async Task FinishAsync(string message, string kind, long owned)
+    {
+        var uuid = _card!.Uuid;
+        Close();
+        await OnChanged.InvokeAsync((message, kind, uuid, owned));
+    }
+
+    private void Close()
+    {
+        _card = null;
+        _copies = [];
+        _removingId = null;
+    }
+}

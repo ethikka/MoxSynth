@@ -154,7 +154,7 @@ public static class ApiEndpoints
 
         // Collection groups, same filters as the Collection page.
         auth.MapGet("/collection", async (string? q, string? sf, string? set, string? finish, string? sort, DateTime? asOf,
-            int? page, int? pageSize, string? provider, CollectionRepository collection, CardRepository cards,
+            bool? removed, int? page, int? pageSize, string? provider, CollectionRepository collection, CardRepository cards,
             PriceRepository prices, CancellationToken ct) =>
         {
             var query = new CollectionQuery
@@ -162,6 +162,7 @@ public static class ApiEndpoints
                 Name = q, Scryfall = sf, SetCode = set, Finish = finish,
                 Sort = Enum.TryParse<CollectionSort>(sort, true, out var s) ? s : CollectionSort.Name,
                 AsOf = asOf?.ToUniversalTime(),
+                IncludeRemoved = removed == true,
                 PriceProvider = ApiMapper.ValidProvider(provider, prices),
                 Page = Math.Max(1, page ?? 1),
                 PageSize = Math.Clamp(pageSize ?? 50, 1, 200),
