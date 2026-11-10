@@ -238,6 +238,8 @@ public static class ApiEndpoints
             return new PageDto<HistoryEventDto>(result.Items.Select(ApiMapper.ToDto).ToList(), result.TotalCount,
                 result.Page, result.PageSize);
         });
+
+        auth.MapDeckApi(); // /api/decks/...
     }
 
     /// <summary>Authenticates the bearer token and makes its profile the current one for this request.</summary>

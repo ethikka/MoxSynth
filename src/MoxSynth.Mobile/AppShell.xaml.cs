@@ -10,6 +10,7 @@ public partial class AppShell : Shell
         InitializeComponent();
         // Pages pushed on top of a tab (resolved from DI, see MauiProgram).
         Routing.RegisterRoute(Routes.Card, typeof(CardDetailPage));
+        Routing.RegisterRoute(Routes.Deck, typeof(DeckPage));
         Routing.RegisterRoute(Routes.Settings, typeof(SettingsPage));
     }
 }

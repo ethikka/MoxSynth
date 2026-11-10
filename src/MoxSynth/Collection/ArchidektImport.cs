@@ -166,7 +166,7 @@ public sealed class ArchidektImporter(CardIndex index)
     /// Without an exact printing: prefer regular paper printings (no promos/masterpieces/online-only) that exist in the
     /// requested finish, newest first (the list is already sorted newest first).
     /// </summary>
-    private static CardRef BestPrinting(IReadOnlyList<CardRef> printings, string finish) =>
+    internal static CardRef BestPrinting(IReadOnlyList<CardRef> printings, string finish) =>
         printings
             .OrderByDescending(p => p.IsRegularPaper)
             .ThenByDescending(p => p.IsPaper)

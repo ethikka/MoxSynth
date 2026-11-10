@@ -1,6 +1,7 @@
 using MoxSynth.Cards;
 using MoxSynth.Collection;
 using MoxSynth.Contracts;
+using MoxSynth.Decks;
 using MoxSynth.Infrastructure;
 using MoxSynth.Prices;
 using MoxSynth.Profiles;
@@ -121,4 +122,30 @@ internal static class ApiMapper
             new PageDto<CollectionGroupDto>(items, page.Groups.TotalCount, page.Groups.Page, page.Groups.PageSize),
             page.TotalCopies, page.TotalValue, page.Currency, page.UnpricedCopies, page.RemovedCopies);
     }
+
+    // ------------------------------------------------------------ decks
+
+    public static DeckFormatDto ToFormatDto(string format) => new(format, DeckFormats.Label(format),
+        DeckFormats.IsCommanderStyle(format), DeckFormats.CommanderDeckSize(format));
+
+    public static DeckSummaryDto ToDto(DeckSummary d) => new(d.Id, d.Name, d.Format, d.CardCount, d.CommanderNames,
+        d.CoverImageUrl, d.UpdatedAt, d.Value, d.Currency, d.IsLegal);
+
+    public static DeckDetailDto ToDto(DeckDetail d) => new(
+        d.Id, d.Name, d.Format, d.Description, d.CreatedAt, d.UpdatedAt,
+        d.Categories.Select(c => new DeckCategoryDto(c.Id, c.Name, c.Position, c.CountsInDeck, c.Role, c.CardCount)).ToList(),
+        d.Cards.Select(ToDto).ToList(),
+        new DeckLegalityDto(d.Legality.IsLegal, d.Legality.Problems, d.Legality.CardReasons),
+        d.Value, d.Currency, d.OwnedCount, d.CardCount, d.CommanderNames, d.CoverImageUrl);
+
+    public static DeckCardDto ToDto(DeckCardView c) => new(
+        c.DeckCardId, c.CardUuid, c.Name, c.SetCode, c.Number, c.Finish, c.Quantity, c.CategoryIds, c.ManaCost,
+        c.ManaValue, c.Colors, c.ColorIdentity, c.TypeLine, c.Types, c.Rarity, c.ImageUrl, c.SmallImageUrl, c.Price,
+        c.OwnedExact, c.OwnedAny, c.IllegalReason);
+
+    public static DeckImportResultDto ToDto(DeckImportResult r, DeckDetail deck) => new(
+        r.Added,
+        r.Unmatched.Select(l => new DeckImportLineDto(l.Line, l.Text, l.Problem)).ToList(),
+        r.Warnings.Select(l => new DeckImportLineDto(l.Line, l.Text, l.Problem)).ToList(),
+        ToDto(deck));
 }

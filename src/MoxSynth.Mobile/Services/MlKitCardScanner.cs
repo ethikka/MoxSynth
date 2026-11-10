@@ -1,16 +1,33 @@
 using MoxSynth.Client.Services;
 using MoxSynth.Contracts;
+using MoxSynth.Mobile.Pages;
 using Plugin.Maui.OCR;
 
 namespace MoxSynth.Mobile.Services;
 
 /// <summary>
-/// Takes a photo with the camera app (or picks one from the gallery) and reads its text on the device with
-/// Google ML Kit (Plugin.Maui.OCR). Only the recognised text + positions go to the server, not the photo.
+/// Reads cards on the device with Google ML Kit: live in the in-app camera view (<see cref="LiveScanPage"/>), or from a
+/// photo picked from the gallery or taken with the camera app (Plugin.Maui.OCR). Only the recognised text + positions
+/// go to the server, never the picture.
 /// </summary>
-public sealed class MlKitCardScanner(IOcrService ocr) : ICardScanner
+public sealed class MlKitCardScanner(IOcrService ocr, IServiceProvider services) : ICardScanner
 {
     private bool _initialized;
+
+    public async Task<LiveScanResult> ScanLiveAsync(
+        Func<IReadOnlyList<OcrLineDto>, CancellationToken, Task<RecognizeResultDto>> recognize, CancellationToken ct = default)
+    {
+        if (!LiveCardCamera.HasBackCamera)
+            throw new InvalidOperationException("This device has no camera.");
+
+        if (await Permissions.RequestAsync<Permissions.Camera>() != PermissionStatus.Granted)
+            throw new InvalidOperationException("MoxSynth needs camera permission to scan cards.");
+
+        var page = services.GetRequiredService<LiveScanPage>();
+        var result = page.Start(recognize, ct);
+        await MainThread.InvokeOnMainThreadAsync(() => Shell.Current.Navigation.PushModalAsync(page));
+        return await result;
+    }
 
     public async Task<IReadOnlyList<OcrLineDto>?> ScanAsync(bool fromGallery, CancellationToken ct = default)
     {

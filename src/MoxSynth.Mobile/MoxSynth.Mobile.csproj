@@ -32,6 +32,11 @@
     <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
     <!-- On-device text recognition (Google ML Kit) for scanning cards. -->
     <PackageReference Include="Plugin.Maui.OCR" Version="1.1.1" />
+    <!-- Live camera view for scanning (CameraX). 1.4.2.3 is built against the AndroidX Core 1.16 / Lifecycle 2.9.2
+         that MAUI already brings in; newer CameraX releases would pull newer AndroidX versions. -->
+    <PackageReference Include="Xamarin.AndroidX.Camera.Camera2" Version="1.4.2.3" />
+    <PackageReference Include="Xamarin.AndroidX.Camera.Lifecycle" Version="1.4.2.3" />
+    <PackageReference Include="Xamarin.AndroidX.Camera.View" Version="1.4.2.3" />
   </ItemGroup>
 
   <ItemGroup>

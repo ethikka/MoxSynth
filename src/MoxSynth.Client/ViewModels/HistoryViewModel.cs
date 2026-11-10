@@ -5,14 +5,29 @@ using MoxSynth.Client.Services;
 namespace MoxSynth.Client.ViewModels;
 
 /// <summary>Everything added to / removed from the collection, newest first.</summary>
-public sealed partial class HistoryViewModel(MoxApiClient api, INavigator nav) : ViewModelBase
+public sealed partial class HistoryViewModel(MoxApiClient api, AppSession session, INavigator nav) : ViewModelBase
 {
     private int _page;
     private int _totalPages;
 
     public ObservableCollection<HistoryItem> Events { get; } = [];
 
-    public override Task OnAppearingAsync() => LoadFirstPageAsync(showBusy: Events.Count == 0);
+    private bool _subscribed;
+
+    public override Task OnAppearingAsync()
+    {
+        if (!_subscribed) session.SignedOut += OnSignedOut;
+        _subscribed = true;
+        return LoadFirstPageAsync(showBusy: Events.Count == 0);
+    }
+
+    /// <summary>Back to the first-launch state so the next account never sees this one's history.</summary>
+    private void OnSignedOut()
+    {
+        Events.Clear();
+        _page = _totalPages = 0;
+        Error = null;
+    }
 
     [RelayCommand]
     private Task RefreshAsync() => LoadFirstPageAsync(showBusy: false);

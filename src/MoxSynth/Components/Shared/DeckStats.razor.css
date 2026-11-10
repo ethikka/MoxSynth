@@ -1,0 +1,111 @@
+.deck-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.deck-stats-heading {
+    font-size: .875rem;
+    font-weight: 700;
+    margin-bottom: .5rem;
+}
+
+.deck-stats-num {
+    font-variant-numeric: tabular-nums;
+}
+
+.deck-stats-total {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: .25rem;
+}
+
+/* ---- mana curve */
+
+.deck-curve {
+    display: flex;
+    gap: 4px;
+    align-items: stretch;
+}
+
+.deck-curve-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: .75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.deck-curve-count {
+    min-height: 1.1em;
+    line-height: 1.1;
+}
+
+.deck-curve-track {
+    height: 90px;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+}
+
+.deck-curve-bar {
+    width: 100%;
+    background: var(--bs-primary);
+    border-radius: 2px 2px 0 0;
+    transition: height .2s ease;
+}
+
+.deck-curve-label {
+    margin-top: 2px;
+    color: var(--bs-secondary-color);
+    border-top: 1px solid var(--bs-border-color);
+    width: 100%;
+    text-align: center;
+}
+
+/* ---- colours */
+
+.deck-color-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .875rem;
+    margin-bottom: .25rem;
+}
+
+.deck-color-dot {
+    flex: none;
+    width: .85rem;
+    height: .85rem;
+    border-radius: 50%;
+    border: 1px solid var(--bs-border-color);
+}
+
+.deck-color-w { background: #f8f3d4; }
+.deck-color-u { background: #3e86c9; }
+.deck-color-b { background: #2b2626; }
+.deck-color-r { background: #d9452e; }
+.deck-color-g { background: #2f8a4b; }
+.deck-color-c { background: #b5b1ad; }
+
+.deck-color-name {
+    flex: none;
+    width: 4.75rem;
+}
+
+.deck-color-track {
+    flex: 1 1 auto;
+    height: .5rem;
+    background: var(--bs-tertiary-bg);
+    border-radius: .25rem;
+    overflow: hidden;
+}
+
+.deck-color-bar {
+    display: block;
+    height: 100%;
+    background: var(--bs-primary);
+    border-radius: .25rem;
+}

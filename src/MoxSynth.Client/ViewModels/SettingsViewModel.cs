@@ -44,6 +44,15 @@ public sealed partial class SettingsViewModel(MoxApiClient api, AppSession sessi
     }
 
     [RelayCommand]
+    private async Task ChangeServerAsync()
+    {
+        if (!await dialogs.ConfirmAsync("Change server",
+                $"This signs out {ProfileName} and lets you connect to another MoxSynth server.", "Change server")) return;
+        await session.SignOutAsync();
+        await nav.GoToAsync(Routes.Login, new Dictionary<string, object> { ["changeServer"] = true });
+    }
+
+    [RelayCommand]
     private async Task SignOutAsync()
     {
         if (!await dialogs.ConfirmAsync("Sign out", $"Sign out {ProfileName} on this device?", "Sign out")) return;

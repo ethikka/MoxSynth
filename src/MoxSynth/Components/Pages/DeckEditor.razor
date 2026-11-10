@@ -1,0 +1,1175 @@
+@page "/decks/{DeckId:long}"
+@using MoxSynth.Decks
+@inject DeckRepository DeckRepo
+@inject ArchidektDeckImport ArchidektImport
+@inject CardRepository Cards
+@inject PriceRepository Prices
+@inject CollectionRepository Collection
+@inject PriceSettings PriceSettings
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>@(_deck?.Name ?? "Deck") · MoxSynth</PageTitle>
+
+@if (_notFound)
+{
+    <div class="alert alert-danger">This deck doesn't exist or was deleted. <a href="decks">Back to your decks</a></div>
+}
+else if (_deck is null)
+{
+    <p class="text-muted">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        Loading…
+    </p>
+}
+else
+{
+    var deck = _deck;
+    var target = TargetSize(deck.Format);
+
+    @* ---------------------------------------------------------------- header *@
+    <div class="d-flex flex-wrap align-items-start gap-2 mb-3">
+        <div class="me-auto">
+            <h1 class="h3 mb-1">
+                @deck.Name
+                @if (_loading)
+                {
+                    <span class="spinner-border spinner-border-sm gap-start-2 align-middle" role="status" aria-label="Loading"></span>
+                }
+            </h1>
+            <div class="text-body-secondary small d-flex flex-wrap align-items-center deck-meta">
+                <span class="badge text-bg-secondary">@DeckFormats.Label(deck.Format)</span>
+                <span>@($"{deck.CardCount}{(target is { } t ? $" / {t}" : "")} cards")</span>
+                @if (FormatValue(deck.Value, deck.Currency) is { } value)
+                {
+                    <span title="Value of the counted cards (@PriceProviders.Label(PriceSettings.Provider))">@value</span>
+                }
+                @if (deck.Legality.IsLegal)
+                {
+                    <span class="text-success">✓ Legal</span>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-link btn-sm p-0 text-danger align-baseline" @onclick="() => _showProblems = !_showProblems"
+                            aria-expanded="@(_showProblems ? "true" : "false")">
+                        @deck.Legality.Problems.Count @(deck.Legality.Problems.Count == 1 ? "problem" : "problems")
+                    </button>
+                }
+                <span>@deck.OwnedCount of @deck.CardCount owned</span>
+            </div>
+            @if (_showProblems && !deck.Legality.IsLegal)
+            {
+                <ul class="small text-danger mt-2 mb-0 deck-problems">
+                    @foreach (var problem in deck.Legality.Problems)
+                    {
+                        <li>@problem</li>
+                    }
+                </ul>
+            }
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="OpenImport">Import</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="OpenExportAsync">Export</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" title="Deck settings" aria-label="Deck settings" @onclick="OpenSettings">⚙</button>
+        </div>
+    </div>
+
+    @if (_actionError is not null)
+    {
+        <div class="alert alert-danger py-2 d-flex align-items-center">
+            <span class="me-auto">@_actionError</span>
+            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _actionError = null"></button>
+        </div>
+    }
+
+    @* ---------------------------------------------------------------- toolbar *@
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div class="deck-add position-relative flex-grow-1">
+            <input @ref="_addInput" class="form-control form-control-sm" placeholder="Add a card: name or Scryfall syntax"
+                   autocomplete="off" spellcheck="false" aria-label="Add a card"
+                   @bind="_addText" @bind:event="oninput" @bind:after="ScheduleSuggestAsync"
+                   @onkeydown="OnAddKeyDownAsync" @onfocusin="() => _suggestOpen = true" @onfocusout="() => _suggestOpen = false" />
+            @if (_suggestOpen && _suggestions.Count > 0 && !string.IsNullOrWhiteSpace(_addText))
+            {
+                <div class="list-group deck-suggestions shadow">
+                    @foreach (var card in _suggestions)
+                    {
+                        <button type="button" class="list-group-item list-group-item-action d-flex align-items-center gap-2 py-1"
+                                @onmousedown:preventDefault="true" @onclick="() => AddSuggestionAsync(card)">
+                            @if (ScryfallImages.Url(card.ScryfallId, "small") is { } img)
+                            {
+                                <img class="deck-suggestion-thumb" src="@img" loading="lazy" alt="" />
+                            }
+                            <span class="me-auto text-truncate">@card.Name</span>
+                            <span class="text-body-secondary small text-uppercase">@card.SetCode</span>
+                            <ManaText Text="@card.ManaCost" />
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+        <div class="d-flex align-items-center gap-1">
+            <label class="small text-body-secondary" for="addInto">into</label>
+            <select id="addInto" class="form-select form-select-sm w-auto" @bind="_addInto">
+                <option value="">Auto (by type)</option>
+                @foreach (var category in OrderedCategories())
+                {
+                    <option value="@category.Name">@category.Name</option>
+                }
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-1">
+            <label class="small text-body-secondary text-nowrap" for="groupBy">Group by</label>
+            <select id="groupBy" class="form-select form-select-sm w-auto" @bind="_groupBy" @bind:after="SaveGroupByAsync">
+                <option value="@GroupCategory">Category</option>
+                <option value="@GroupType">Type</option>
+                <option value="@GroupManaValue">Mana value</option>
+            </select>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="View">
+            <button type="button" class="btn @(_view == ViewTable ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => SetViewAsync(ViewTable)">Table</button>
+            <button type="button" class="btn @(_view == ViewStacks ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => SetViewAsync(ViewStacks)">Stacks</button>
+            <button type="button" class="btn @(_view == ViewText ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => SetViewAsync(ViewText)">Text</button>
+        </div>
+    </div>
+
+    @* ---------------------------------------------------------------- body *@
+    <div class="row g-3">
+        <div class="col-lg-9">
+            @if (_view == ViewStacks)
+            {
+                <DeckStacks Deck="_deck" GroupBy="@_groupBy" OnCardClick="OpenCardEditor" />
+            }
+            else if (_view == ViewText)
+            {
+                <div class="d-flex justify-content-end mb-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CopyExportAsync" disabled="@(_exportText is null)">Copy</button>
+                </div>
+                @if (_exportText is null)
+                {
+                    <p class="text-muted"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading…</p>
+                }
+                else
+                {
+                    <pre class="deck-text">@_exportText</pre>
+                }
+            }
+            else
+            {
+                var groups = BuildGroups();
+                @if (groups.Count == 0)
+                {
+                    <div class="alert alert-light">This deck is empty. Add cards with the box above, or import a list.</div>
+                }
+                else
+                {
+                    var categoryGroups = groups.Where(g => g.Category is not null).ToList();
+                    <table class="table table-sm table-hover deck-table">
+                        @foreach (var group in groups)
+                        {
+                            var g = group;
+                            <tbody>
+                                <tr class="deck-group-header @(g.Muted ? "deck-group-muted" : "")">
+                                    <th colspan="7">
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (g.Category is { } cat && _renamingCategoryId == cat.Id)
+                                            {
+                                                <form class="d-flex gap-1 align-items-center" @onsubmit="() => RenameCategoryAsync(cat)">
+                                                    <input class="form-control form-control-sm" @bind="_renameText" @bind:event="oninput" aria-label="Category name" />
+                                                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                                                    <button type="button" class="btn btn-link btn-sm" @onclick="() => _renamingCategoryId = null">Cancel</button>
+                                                </form>
+                                            }
+                                            else if (g.Category is { } doomed && _confirmDeleteCategoryId == doomed.Id)
+                                            {
+                                                <span class="d-flex flex-wrap align-items-center gap-1">
+                                                    <span class="small fw-normal">Delete category @doomed.Name? Its cards move to their next category.</span>
+                                                    <button type="button" class="btn btn-danger btn-sm py-0" disabled="@_busy" @onclick="() => DeleteCategoryAsync(doomed)">Yes, delete</button>
+                                                    <button type="button" class="btn btn-link btn-sm py-0" @onclick="() => _confirmDeleteCategoryId = null">Cancel</button>
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span>@g.Name</span>
+                                            }
+                                            <span class="ms-auto deck-group-count">@g.Quantity</span>
+                                            @if (g.Category is { } category)
+                                            {
+                                                var index = categoryGroups.IndexOf(g);
+                                                var up = index > 0 && CategoryRank(categoryGroups[index - 1].Category!) == CategoryRank(category) ? categoryGroups[index - 1].Category : null;
+                                                var down = index < categoryGroups.Count - 1 && CategoryRank(categoryGroups[index + 1].Category!) == CategoryRank(category) ? categoryGroups[index + 1].Category : null;
+                                                <div class="position-relative">
+                                                    <button type="button" class="btn btn-link btn-sm py-0 px-1 deck-group-menu-toggle" title="Category actions" aria-label="Category actions"
+                                                            @onclick="() => _menuCategoryId = _menuCategoryId == category.Id ? null : category.Id">⋯</button>
+                                                    @if (_menuCategoryId == category.Id)
+                                                    {
+                                                        <div class="profile-menu-backdrop" @onclick="() => _menuCategoryId = null"></div>
+                                                        <div class="dropdown-menu dropdown-menu-end show deck-group-menu">
+                                                            <button type="button" class="dropdown-item" @onclick="() => StartRename(category)">Rename</button>
+                                                            <button type="button" class="dropdown-item" disabled="@(up is null)" @onclick="() => MoveCategoryAsync(category, up)">Move up</button>
+                                                            <button type="button" class="dropdown-item" disabled="@(down is null)" @onclick="() => MoveCategoryAsync(category, down)">Move down</button>
+                                                            <button type="button" class="dropdown-item" @onclick="() => ToggleCountsAsync(category)">
+                                                                @(category.CountsInDeck ? "✓ " : "")Counts toward deck
+                                                            </button>
+                                                            @if (category.Role is null)
+                                                            {
+                                                                <div class="dropdown-divider"></div>
+                                                                <button type="button" class="dropdown-item text-danger" @onclick="() => ConfirmDeleteCategory(category)">Delete</button>
+                                                            }
+                                                        </div>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                    </th>
+                                </tr>
+                                @foreach (var card in g.Cards)
+                                {
+                                    var c = card;
+                                    <tr>
+                                        <td class="deck-qty text-nowrap">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="@(c.Quantity <= 1 ? "Remove from deck" : "One less")"
+                                                    @onclick="() => SetQuantityAsync(c, c.Quantity - 1)">−</button>
+                                            <span class="deck-qty-value">@c.Quantity</span>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1" title="One more"
+                                                    @onclick="() => SetQuantityAsync(c, c.Quantity + 1)">+</button>
+                                        </td>
+                                        <td>
+                                            <span class="deck-card-name">
+                                                <button type="button" class="btn btn-link p-0 text-start deck-card-link" @onclick="() => OpenCardEditor(c)">@c.Name</button>
+                                                @if (c.ImageUrl is { } preview)
+                                                {
+                                                    <img class="deck-card-preview" src="@preview" loading="lazy" alt="" />
+                                                }
+                                            </span>
+                                            <span class="text-body-secondary small text-uppercase gap-start-1">@c.SetCode</span>
+                                            @if (c.Finish == CardFinishes.Foil)
+                                            {
+                                                <span class="badge text-bg-info gap-start-1">Foil</span>
+                                            }
+                                            else if (c.Finish != CardFinishes.NonFoil)
+                                            {
+                                                <span class="badge text-bg-info gap-start-1">@CardFinishes.Label(c.Finish)</span>
+                                            }
+                                        </td>
+                                        <td class="text-nowrap"><ManaText Text="@c.ManaCost" /></td>
+                                        <td class="small d-none d-md-table-cell">@c.TypeLine</td>
+                                        <td class="small text-end text-nowrap" title="@(c.Price is { } p && c.Quantity > 1 ? $"{c.Quantity} × {FormatValue(p, deck.Currency)} = {FormatValue(p * c.Quantity, deck.Currency)}" : null)">
+                                            @FormatValue(c.Price, deck.Currency)
+                                        </td>
+                                        <td class="text-nowrap">
+                                            @if (c.OwnedExact >= c.Quantity)
+                                            {
+                                                <span class="badge text-bg-success">Owned</span>
+                                            }
+                                            else if (c.OwnedAny == 0)
+                                            {
+                                                <span class="badge text-bg-danger">Missing</span>
+                                            }
+                                            else
+                                            {
+                                                var have = Math.Min(c.OwnedAny, c.Quantity);
+                                                <span class="badge text-bg-warning" title="@(c.OwnedExact < have ? "Own other printings" : $"{c.OwnedAny} owned")">@have of @c.Quantity</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            @if (c.IllegalReason is { } reason)
+                                            {
+                                                <span class="text-danger" title="@reason" aria-label="@reason">⚠</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        }
+                    </table>
+                }
+            }
+        </div>
+        <div class="col-lg-3">
+            <DeckStats Deck="_deck" />
+        </div>
+    </div>
+}
+
+@* ---------------------------------------------------------------- card editor modal *@
+@if (_editCard is { } editing && _deck is not null)
+{
+    var selected = _editPrintings.FirstOrDefault(p => p.Uuid == _editUuid);
+    <div class="scanner-backdrop" @onclick="CloseCardEditor">
+        <div class="card scanner-dialog deck-dialog" @onclick:stopPropagation="true">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>@editing.Name</strong>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="CloseCardEditor"></button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-4 d-none d-sm-block">
+                        @if ((ScryfallImages.Url(selected?.ScryfallId, "normal") ?? editing.ImageUrl) is { } editImage)
+                        {
+                            <img class="card-image" src="@editImage" alt="" />
+                        }
+                    </div>
+                    <div class="col-sm-8">
+                        <div class="mb-2">
+                            <label class="form-label small mb-0" for="editPrinting">Printing</label>
+                            @if (_editPrintings.Count == 0)
+                            {
+                                <div class="small text-muted">Loading printings…</div>
+                            }
+                            else
+                            {
+                                <select id="editPrinting" class="form-select form-select-sm" @bind="_editUuid" @bind:after="OnEditPrintingChanged">
+                                    @foreach (var printing in _editPrintings)
+                                    {
+                                        <option value="@printing.Uuid">@PrintingLabel(printing)</option>
+                                    }
+                                </select>
+                                @if (!_editOwned.ContainsKey(_editUuid) && _editOwned.Count > 0)
+                                {
+                                    <div class="small text-muted">You own this card in another printing</div>
+                                }
+                            }
+                        </div>
+                        <div class="row g-2 mb-2">
+                            <div class="col-7">
+                                <label class="form-label small mb-0" for="editFinish">Finish</label>
+                                <select id="editFinish" class="form-select form-select-sm" @bind="_editFinish">
+                                    @foreach (var finish in selected?.FinishList ?? [editing.Finish])
+                                    {
+                                        <option value="@finish">@CardFinishes.Label(finish)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-5">
+                                <label class="form-label small mb-0" for="editQty">Quantity</label>
+                                <input id="editQty" type="number" min="0" class="form-control form-control-sm" @bind="_editQty" />
+                            </div>
+                        </div>
+                        <div class="mb-1 small">Categories <span class="text-body-secondary">(the primary one is where the card is listed)</span></div>
+                        <div class="deck-edit-categories mb-2">
+                            @for (var i = 0; i < _editCategoryChoices.Count; i++)
+                            {
+                                var n = _editCategoryChoices[i];
+                                var idx = i;
+                                var isChecked = _editChecked.Contains(n);
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="form-check mb-0 me-auto">
+                                        <input class="form-check-input" type="checkbox" id="edit-cat-@idx" checked="@isChecked"
+                                               @onchange="e => ToggleEditCategory(n, e.Value is true)" />
+                                        <label class="form-check-label small" for="edit-cat-@idx">@n</label>
+                                    </div>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="radio" name="primaryCategory" id="edit-primary-@idx"
+                                               checked="@(isChecked && string.Equals(_editPrimary, n, StringComparison.OrdinalIgnoreCase))"
+                                               disabled="@(!isChecked)" @onchange="() => _editPrimary = n" />
+                                        <label class="form-check-label small text-body-secondary" for="edit-primary-@idx">make primary</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                        <form class="d-flex gap-1" @onsubmit="AddEditCategory">
+                            <input class="form-control form-control-sm" placeholder="New category" aria-label="New category" @bind="_editNewCategory" @bind:event="oninput" />
+                            <button type="submit" class="btn btn-outline-secondary btn-sm" disabled="@string.IsNullOrWhiteSpace(_editNewCategory)">Add</button>
+                        </form>
+                        @if (_editError is not null)
+                        {
+                            <div class="text-danger small mt-2" role="alert">@_editError</div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <button type="button" class="btn btn-outline-danger btn-sm me-auto" disabled="@_busy" @onclick="RemoveEditedCardAsync">Remove from deck</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseCardEditor">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" disabled="@(_busy || _editPrintings.Count == 0)" @onclick="SaveCardAsync">Save</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---------------------------------------------------------------- import modal *@
+@if (_showImport)
+{
+    <div class="scanner-backdrop" @onclick="() => _showImport = false">
+        <div class="card scanner-dialog deck-dialog" @onclick:stopPropagation="true">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Import cards</strong>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => _showImport = false"></button>
+            </div>
+            <div class="card-body">
+                <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Import from">
+                    <button type="button" class="btn @(_importFromArchidekt ? "btn-outline-secondary" : "btn-secondary")" @onclick="() => SetImportSource(false)">Paste list</button>
+                    <button type="button" class="btn @(_importFromArchidekt ? "btn-secondary" : "btn-outline-secondary")" @onclick="() => SetImportSource(true)">From Archidekt</button>
+                </div>
+                @if (_importFromArchidekt)
+                {
+                    <input class="form-control mb-1" type="text" inputmode="url" autocomplete="off" aria-label="Archidekt deck link"
+                           placeholder="https://archidekt.com/decks/123456/my-deck" @bind="_importArchidektUrl" @bind:event="oninput" />
+                    <div class="form-text mb-2">The deck must be public. Its cards and categories are added to this deck.</div>
+                }
+                else
+                {
+                    <textarea class="form-control font-monospace small mb-2" rows="10" spellcheck="false" aria-label="Deck list"
+                              placeholder="@("1 Sol Ring (CMM) 400\n1x Arcane Signet [Ramp]")" @bind="_importText" @bind:event="oninput"></textarea>
+                }
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="importReplace" @bind="_importReplace" />
+                    <label class="form-check-label small" for="importReplace">Replace the current list</label>
+                </div>
+                @if (_importError is not null)
+                {
+                    <div class="text-danger small mt-2" role="alert">@_importError</div>
+                }
+                @if (_importResult is { } result)
+                {
+                    <div class="mt-3 small">
+                        <div class="fw-semibold">Added @result.Added @(result.Added == 1 ? "card" : "cards")</div>
+                        @if (result.Warnings.Count > 0)
+                        {
+                            <ul class="text-warning-emphasis mb-1">
+                                @foreach (var w in result.Warnings)
+                                {
+                                    <li>Line @w.Line: @w.Text — @w.Problem</li>
+                                }
+                            </ul>
+                        }
+                        @if (result.Unmatched.Count > 0)
+                        {
+                            <div class="text-danger mt-1">Not imported:</div>
+                            <ul class="text-danger mb-0">
+                                @foreach (var u in result.Unmatched)
+                                {
+                                    <li>Line @u.Line: <code>@u.Text</code> — @u.Problem</li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                }
+            </div>
+            <div class="card-footer d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => _showImport = false">Close</button>
+                <button type="button" class="btn btn-primary btn-sm" disabled="@(_busy || string.IsNullOrWhiteSpace(_importFromArchidekt ? _importArchidektUrl : _importText))" @onclick="ImportAsync">Import</button>
+            </div>
+        </div>
+    </div>
+}
+
+@* ---------------------------------------------------------------- export modal *@
+@if (_showExport)
+{
+    <div class="scanner-backdrop" @onclick="() => _showExport = false">
+        <div class="card scanner-dialog deck-dialog" @onclick:stopPropagation="true">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Export</strong>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="() => _showExport = false"></button>
+            </div>
+            <div class="card-body">
+                @if (_exportText is null)
+                {
+                    <p class="text-muted mb-0"><span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading…</p>
+                }
+                else
+                {
+                    <pre class="deck-text deck-text-modal mb-0">@_exportText</pre>
+                }
+            </div>
+            <div class="card-footer d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(_exportText is null)" @onclick="CopyExportAsync">Copy</button>
+                @if (_exportText is not null)
+                {
+                    <a class="btn btn-primary btn-sm" href="@("data:text/plain;charset=utf-8," + Uri.EscapeDataString(_exportText))" download="@ExportFileName()">Download .txt</a>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@* ---------------------------------------------------------------- settings modal *@
+@if (_showSettings && _deck is not null)
+{
+    <div class="scanner-backdrop" @onclick="() => _showSettings = false">
+        <div class="card scanner-dialog deck-dialog" @onclick:stopPropagation="true">
+            <form @onsubmit="SaveSettingsAsync">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Deck settings</strong>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="() => _showSettings = false"></button>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small mb-0" for="deckName">Name</label>
+                        <input id="deckName" class="form-control" autocomplete="off" @bind="_settingsName" @bind:event="oninput" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small mb-0" for="deckFormat">Format</label>
+                        <select id="deckFormat" class="form-select" @bind="_settingsFormat">
+                            @foreach (var format in _formats)
+                            {
+                                <option value="@format">@DeckFormats.Label(format)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small mb-0" for="deckDescription">Description (optional)</label>
+                        <textarea id="deckDescription" class="form-control" rows="3" @bind="_settingsDescription"></textarea>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@_busy" @onclick="DuplicateAsync">Duplicate</button>
+                        @if (_confirmDelete)
+                        {
+                            <span class="small">Delete this deck?</span>
+                            <button type="button" class="btn btn-danger btn-sm" disabled="@_busy" @onclick="DeleteDeckAsync">Yes, delete</button>
+                            <button type="button" class="btn btn-link btn-sm" @onclick="() => _confirmDelete = false">Cancel</button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-outline-danger btn-sm" disabled="@_busy" @onclick="() => _confirmDelete = true">Delete</button>
+                        }
+                    </div>
+                    @if (_settingsError is not null)
+                    {
+                        <div class="text-danger small mt-2" role="alert">@_settingsError</div>
+                    }
+                </div>
+                <div class="card-footer d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="() => _showSettings = false">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled="@(_busy || string.IsNullOrWhiteSpace(_settingsName))">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<Toast @ref="_toast" />
+
+@code {
+    [Parameter] public long DeckId { get; set; }
+
+    private const string ViewTable = "table";
+    private const string ViewStacks = "stacks";
+    private const string ViewText = "text";
+    private const string GroupCategory = DeckGrouping.ByCategory;
+    private const string GroupType = DeckGrouping.ByType;
+    private const string GroupManaValue = DeckGrouping.ByManaValue;
+    private const string ViewPrefKey = "moxsynth-deck-view";
+    private const string GroupByPrefKey = "moxsynth-deck-groupby";
+
+    private DeckDetail? _deck;
+    private long _loadedDeckId;
+    private bool _loading;
+    private bool _notFound;
+    private bool _busy;
+    private int _loadVersion;
+    private string? _actionError;
+    private bool _showProblems;
+    private Toast? _toast;
+
+    private string _view = ViewTable;
+    private string _groupBy = GroupCategory;
+
+    // Add-card box
+    private ElementReference _addInput;
+    private string? _addText;
+    private string _addInto = "";
+    private IReadOnlyList<CardSummary> _suggestions = [];
+    private string _suggestedFor = "";
+    private bool _suggestOpen;
+    private CancellationTokenSource? _suggestDebounce;
+    private int _suggestVersion;
+
+    // Category header menu
+    private long? _menuCategoryId;
+    private long? _renamingCategoryId;
+    private long? _confirmDeleteCategoryId;
+    private string _renameText = "";
+
+    // Card editor
+    private DeckCardView? _editCard;
+    private List<CardSummary> _editPrintings = [];
+    private Dictionary<string, (int Total, int Foil)> _editOwned = new();
+    private Dictionary<string, Dictionary<string, PriceInfo>> _editPrices = new();
+    private string _editUuid = "";
+    private string _editFinish = "";
+    private int _editQty;
+    private List<string> _editCategoryChoices = [];
+    private HashSet<string> _editChecked = new(StringComparer.OrdinalIgnoreCase);
+    private string? _editPrimary;
+    private string _editNewCategory = "";
+    private string? _editError;
+
+    // Import / export
+    private bool _showImport;
+    private string? _importText;
+    private bool _importReplace;
+    private bool _importFromArchidekt;
+    private string? _importArchidektUrl;
+    private DeckImportResult? _importResult;
+    private string? _importError;
+    private bool _showExport;
+    private string? _exportText;
+
+    // Settings
+    private bool _showSettings;
+    private IReadOnlyList<string> _formats = [];
+    private string _settingsName = "";
+    private string _settingsFormat = "";
+    private string? _settingsDescription;
+    private string? _settingsError;
+    private bool _confirmDelete;
+
+    private string? Provider => Prices.IsAvailable ? PriceSettings.Provider : null;
+
+    protected override void OnInitialized() => PriceSettings.Changed += OnPriceProviderChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (DeckId == _loadedDeckId && _deck is not null) return;
+        _loadedDeckId = DeckId;
+        _deck = null;
+        _notFound = false;
+        _exportText = null;
+        _editCard = null;
+        _showImport = _showExport = _showSettings = false;
+        _menuCategoryId = _renamingCategoryId = _confirmDeleteCategoryId = null;
+        _actionError = null;
+        await ReloadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        // Per-browser preferences; storage (or the JS connection) may be unavailable.
+        var changed = false;
+        try
+        {
+            var view = await JS.InvokeAsync<string?>("moxPrefs.get", ViewPrefKey);
+            if (view is ViewTable or ViewStacks or ViewText && view != _view)
+            {
+                _view = view;
+                changed = true;
+            }
+            var groupBy = await JS.InvokeAsync<string?>("moxPrefs.get", GroupByPrefKey);
+            if (groupBy is GroupCategory or GroupType or GroupManaValue && groupBy != _groupBy)
+            {
+                _groupBy = groupBy;
+                changed = true;
+            }
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+        }
+        if (!changed) return;
+        if (_view == ViewText) await LoadExportTextAsync();
+        StateHasChanged();
+    }
+
+    private async Task SavePrefAsync(string key, string value)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("moxPrefs.set", key, value);
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+        }
+    }
+
+    private void OnPriceProviderChanged() => InvokeAsync(async () =>
+    {
+        await ReloadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        _suggestDebounce?.Cancel();
+        PriceSettings.Changed -= OnPriceProviderChanged;
+    }
+
+    private static bool IsDeckError(Exception ex) => ex is DeckNotFoundException or ArgumentException or InvalidOperationException;
+
+    /// <summary>Reloads the whole deck (the old one stays on screen meanwhile, so the scroll position is kept).</summary>
+    private async Task ReloadAsync()
+    {
+        var version = ++_loadVersion;
+        _loading = true;
+        try
+        {
+            var deck = await DeckRepo.GetAsync(DeckId, Provider);
+            var text = _view == ViewText || _showExport ? await DeckRepo.ExportTextAsync(DeckId) : null;
+            if (version != _loadVersion) return;
+            _deck = deck;
+            _exportText = text;
+        }
+        catch (DeckNotFoundException)
+        {
+            if (version != _loadVersion) return;
+            _deck = null;
+            _notFound = true;
+        }
+        finally
+        {
+            if (version == _loadVersion) _loading = false;
+        }
+    }
+
+    /// <summary>Runs a change, then reloads the deck. Returns the error message (also shown above the list unless <paramref name="showInline"/> is false).</summary>
+    private async Task<string?> MutateAsync(Func<Task> action, bool showInline = true)
+    {
+        string? error = null;
+        _busy = true;
+        try
+        {
+            await action();
+            if (showInline) _actionError = null;
+        }
+        catch (Exception ex) when (IsDeckError(ex))
+        {
+            error = ex.Message;
+            if (showInline) _actionError = error;
+        }
+        finally
+        {
+            _busy = false;
+        }
+        await ReloadAsync();
+        return error;
+    }
+
+    private static string? FormatValue(double? value, string? currency) =>
+        value is { } v ? PriceProviders.CurrencySymbol(currency) + v.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    /// <summary>Deck size shown after the card count: commander-style formats their exact size, constructed formats 60.</summary>
+    private static int? TargetSize(string format) =>
+        DeckFormats.CommanderDeckSize(format) ?? (format == DeckFormats.Casual ? null : 60);
+
+    // ================================================================== grouping
+
+    private static int CategoryRank(DeckCategoryView category) => DeckGrouping.CategoryRank(category);
+
+    private IEnumerable<DeckCategoryView> OrderedCategories() => DeckGrouping.OrderedCategories(_deck);
+
+    private List<DeckCardGroup> BuildGroups() => DeckGrouping.Build(_deck, _groupBy);
+
+    // ================================================================== view & grouping
+
+    private async Task SetViewAsync(string view)
+    {
+        if (_view == view) return;
+        _view = view;
+        await SavePrefAsync(ViewPrefKey, view);
+        if (view == ViewText) await LoadExportTextAsync();
+    }
+
+    private Task SaveGroupByAsync() => SavePrefAsync(GroupByPrefKey, _groupBy);
+
+    private async Task LoadExportTextAsync()
+    {
+        try
+        {
+            _exportText = await DeckRepo.ExportTextAsync(DeckId);
+        }
+        catch (Exception ex) when (IsDeckError(ex))
+        {
+            _actionError = ex.Message;
+        }
+    }
+
+    private async Task CopyExportAsync()
+    {
+        if (_exportText is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _exportText);
+            _toast?.Show("Copied the deck list");
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+            _toast?.Show("Couldn't copy to the clipboard", "danger");
+        }
+    }
+
+    private string ExportFileName()
+    {
+        var name = new string((_deck?.Name ?? "deck").Select(ch => System.IO.Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch).ToArray()).Trim();
+        return (name.Length == 0 ? "deck" : name) + ".txt";
+    }
+
+    // ================================================================== add card
+
+    private async Task ScheduleSuggestAsync()
+    {
+        _suggestOpen = true;
+        _suggestDebounce?.Cancel();
+        var cts = _suggestDebounce = new CancellationTokenSource();
+        try
+        {
+            await Task.Delay(300, cts.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        await SuggestNowAsync();
+    }
+
+    private async Task SuggestNowAsync()
+    {
+        var text = _addText?.Trim() ?? "";
+        var version = ++_suggestVersion;
+        if (text.Length == 0)
+        {
+            _suggestions = [];
+            _suggestedFor = "";
+            return;
+        }
+        var result = await Cards.SearchAsync(LooksLikeScryfall(text)
+            ? new CardSearchQuery { Scryfall = text, PageSize = 8 }
+            : new CardSearchQuery { Name = text, PageSize = 8 });
+        if (version != _suggestVersion) return;
+        _suggestions = result.Items;
+        _suggestedFor = text;
+    }
+
+    /// <summary>Plain words search by name (with ranking, as on the Search page); anything with operators is Scryfall syntax.</summary>
+    private static bool LooksLikeScryfall(string text) => text.IndexOfAny([':', '<', '>', '=', '"', '!', '(']) >= 0;
+
+    private async Task OnAddKeyDownAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+        {
+            _suggestOpen = false;
+            return;
+        }
+        if (e.Key != "Enter") return;
+        _suggestDebounce?.Cancel();
+        if ((_addText?.Trim() ?? "") != _suggestedFor) await SuggestNowAsync();
+        if (_suggestions.Count > 0) await AddSuggestionAsync(_suggestions[0]);
+    }
+
+    private async Task AddSuggestionAsync(CardSummary card)
+    {
+        var into = string.IsNullOrEmpty(_addInto) ? null : _addInto;
+        var finish = card.FinishList.Count > 0 ? card.FinishList[0] : CardFinishes.NonFoil;
+        var error = await MutateAsync(() => DeckRepo.AddCardAsync(DeckId, card.Uuid, 1, finish, into));
+        if (error is null)
+        {
+            _suggestDebounce?.Cancel();
+            ++_suggestVersion;
+            _addText = "";
+            _suggestions = [];
+            _suggestedFor = "";
+            _toast?.Show($"Added {card.Name} ({card.SetCode})");
+        }
+        try
+        {
+            await _addInput.FocusAsync();
+        }
+        catch (Exception ex) when (ex is JSException or JSDisconnectedException or InvalidOperationException or TaskCanceledException)
+        {
+        }
+    }
+
+    // ================================================================== rows & categories
+
+    private Task SetQuantityAsync(DeckCardView card, int quantity) =>
+        MutateAsync(() => DeckRepo.SetQuantityAsync(card.DeckCardId, Math.Max(0, quantity)));
+
+    private void StartRename(DeckCategoryView category)
+    {
+        _menuCategoryId = null;
+        _renamingCategoryId = category.Id;
+        _renameText = category.Name;
+    }
+
+    private async Task RenameCategoryAsync(DeckCategoryView category)
+    {
+        if (await MutateAsync(() => DeckRepo.RenameCategoryAsync(category.Id, _renameText)) is null)
+            _renamingCategoryId = null;
+    }
+
+    /// <summary>Moves <paramref name="category"/> to <paramref name="neighbour"/>'s place (before it going up, after it going down).</summary>
+    private async Task MoveCategoryAsync(DeckCategoryView category, DeckCategoryView? neighbour)
+    {
+        _menuCategoryId = null;
+        if (neighbour is null || _deck is null) return;
+        var position = _deck.Categories.ToList().FindIndex(c => c.Id == neighbour.Id);
+        if (position < 0) return;
+        await MutateAsync(() => DeckRepo.MoveCategoryAsync(category.Id, position));
+    }
+
+    private async Task ToggleCountsAsync(DeckCategoryView category)
+    {
+        _menuCategoryId = null;
+        await MutateAsync(() => DeckRepo.SetCategoryCountsAsync(category.Id, !category.CountsInDeck));
+    }
+
+    private void ConfirmDeleteCategory(DeckCategoryView category)
+    {
+        _menuCategoryId = _renamingCategoryId = null;
+        _confirmDeleteCategoryId = category.Id;
+    }
+
+    private async Task DeleteCategoryAsync(DeckCategoryView category)
+    {
+        _menuCategoryId = _confirmDeleteCategoryId = null;
+        if (await MutateAsync(() => DeckRepo.DeleteCategoryAsync(category.Id)) is null)
+        {
+            if (string.Equals(_addInto, category.Name, StringComparison.OrdinalIgnoreCase)) _addInto = "";
+            _toast?.Show($"Deleted category {category.Name}", "secondary");
+        }
+    }
+
+    // ================================================================== card editor
+
+    private async Task OpenCardEditor(DeckCardView card)
+    {
+        if (_deck is null) return;
+        _editCard = card;
+        _editUuid = card.CardUuid;
+        _editFinish = card.Finish;
+        _editQty = card.Quantity;
+        _editError = null;
+        _editNewCategory = "";
+        _editPrintings = [];
+        _editPrices = new();
+        _editOwned = new();
+
+        var names = _deck.Categories.ToDictionary(c => c.Id, c => c.Name);
+        _editCategoryChoices = OrderedCategories().Select(c => c.Name).ToList();
+        var current = card.CategoryIds.Where(names.ContainsKey).Select(id => names[id]).ToList();
+        _editChecked = new HashSet<string>(current, StringComparer.OrdinalIgnoreCase);
+        _editPrimary = current.FirstOrDefault();
+        StateHasChanged();
+
+        // All printings of this card name, newest first.
+        var details = await Cards.GetDetailsAsync(card.CardUuid);
+        var self = (await Cards.GetSummariesAsync([card.CardUuid])).GetValueOrDefault(card.CardUuid);
+        var printings = new List<CardSummary>();
+        if (self is not null) printings.Add(self);
+        if (details is not null) printings.AddRange(details.OtherPrintings.Where(p => p.Uuid != card.CardUuid));
+        printings = printings
+            .OrderByDescending(p => p.ReleaseDate ?? "")
+            .ThenBy(p => p.SetCode)
+            .ToList();
+        var prices = Provider is { } provider ? await Prices.GetAsync(printings.Select(p => p.Uuid), provider) : new();
+        var owned = await Collection.GetOwnedFinishCountsAsync(printings.Select(p => p.Uuid));
+        if (!ReferenceEquals(_editCard, card)) return;   // closed or another card opened meanwhile
+        _editPrintings = printings;
+        _editPrices = prices;
+        _editOwned = owned;
+    }
+
+    private string PrintingLabel(CardSummary printing)
+    {
+        var label = $"{printing.SetName ?? printing.SetCode} ({printing.SetCode}) #{printing.Number}";
+        if (_editPrices.TryGetValue(printing.Uuid, out var byFinish))
+        {
+            var price = byFinish.GetValueOrDefault(_editFinish)
+                        ?? printing.FinishList.Select(f => byFinish.GetValueOrDefault(f)).FirstOrDefault(p => p is not null);
+            if (price is not null) label += $" — {price.Format()}";
+        }
+        if (_editOwned.TryGetValue(printing.Uuid, out var owned))
+            label += owned.Foil > 0 ? $" · ✓ {owned.Total} owned ({owned.Foil} foil)" : $" · ✓ {owned.Total} owned";
+        return label;
+    }
+
+    private void OnEditPrintingChanged()
+    {
+        var printing = _editPrintings.FirstOrDefault(p => p.Uuid == _editUuid);
+        if (printing is not null && !printing.FinishList.Contains(_editFinish))
+            _editFinish = printing.FinishList.Count > 0 ? printing.FinishList[0] : CardFinishes.NonFoil;
+    }
+
+    private void ToggleEditCategory(string name, bool isChecked)
+    {
+        if (isChecked)
+        {
+            _editChecked.Add(name);
+            _editPrimary ??= name;
+        }
+        else
+        {
+            _editChecked.Remove(name);
+            if (string.Equals(_editPrimary, name, StringComparison.OrdinalIgnoreCase))
+                _editPrimary = _editCategoryChoices.FirstOrDefault(_editChecked.Contains);
+        }
+    }
+
+    private void AddEditCategory()
+    {
+        var name = _editNewCategory.Trim();
+        if (name.Length == 0) return;
+        var existing = _editCategoryChoices.FirstOrDefault(c => c.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (existing is null) _editCategoryChoices.Add(name);
+        ToggleEditCategory(existing ?? name, true);
+        _editNewCategory = "";
+    }
+
+    private void CloseCardEditor() => _editCard = null;
+
+    private async Task SaveCardAsync()
+    {
+        if (_editCard is not { } card || _deck is null) return;
+        var names = _deck.Categories.ToDictionary(c => c.Id, c => c.Name);
+        var currentNames = card.CategoryIds.Where(names.ContainsKey).Select(id => names[id]).ToList();
+        var newNames = _editCategoryChoices.Where(_editChecked.Contains)
+            .OrderBy(n => string.Equals(n, _editPrimary, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ToList();
+        var qty = _editQty;
+
+        var error = await MutateAsync(async () =>
+        {
+            var id = card.DeckCardId;
+            if (qty != card.Quantity) await DeckRepo.SetQuantityAsync(id, Math.Max(0, qty));
+            if (qty <= 0) return;
+            if (_editUuid != card.CardUuid || _editFinish != card.Finish)
+                id = await DeckRepo.ChangePrintingAsync(id, _editUuid, _editFinish);
+            if (!newNames.SequenceEqual(currentNames, StringComparer.OrdinalIgnoreCase))
+                await DeckRepo.SetCategoriesAsync(id, newNames);
+        }, showInline: false);
+
+        if (error is null) _editCard = null;
+        else _editError = error;
+    }
+
+    private async Task RemoveEditedCardAsync()
+    {
+        if (_editCard is not { } card) return;
+        var error = await MutateAsync(() => DeckRepo.SetQuantityAsync(card.DeckCardId, 0), showInline: false);
+        if (error is null)
+        {
+            _editCard = null;
+            _toast?.Show($"Removed {card.Name}", "secondary");
+        }
+        else _editError = error;
+    }
+
+    // ================================================================== import / export
+
+    private void OpenImport()
+    {
+        _importResult = null;
+        _importError = null;
+        _showImport = true;
+    }
+
+    private void SetImportSource(bool fromArchidekt)
+    {
+        _importFromArchidekt = fromArchidekt;
+        _importResult = null;
+        _importError = null;
+    }
+
+    private async Task ImportFromArchidektAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_importArchidektUrl)) return;
+        ArchidektImportResult? imported = null;
+        var url = _importArchidektUrl;
+        var replace = _importReplace;
+        var error = await MutateAsync(async () => imported = await ArchidektImport.ImportIntoAsync(DeckId, url, replace), showInline: false);
+        _importError = error;
+        _importResult = imported?.Import;
+        if (imported is null) return;
+
+        _importReplace = false;
+        if (imported.Import.Unmatched.Count == 0 && imported.Import.Warnings.Count == 0)
+        {
+            _showImport = false;
+            _importArchidektUrl = null;
+            _toast?.Show($"Added {imported.Import.Added} {(imported.Import.Added == 1 ? "card" : "cards")} from Archidekt");
+        }
+    }
+
+    private async Task ImportAsync()
+    {
+        if (_importFromArchidekt)
+        {
+            await ImportFromArchidektAsync();
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(_importText)) return;
+        DeckImportResult? result = null;
+        var text = _importText;
+        var replace = _importReplace;
+        var error = await MutateAsync(async () => result = await DeckRepo.ImportTextAsync(DeckId, text, replace), showInline: false);
+        _importError = error;
+        _importResult = result;
+        if (result is null) return;
+
+        if (result.Unmatched.Count == 0 && result.Warnings.Count == 0)
+        {
+            _showImport = false;
+            _importText = null;
+            _importReplace = false;
+            _toast?.Show($"Added {result.Added} {(result.Added == 1 ? "card" : "cards")}");
+            return;
+        }
+        // Keep only the lines that weren't imported, so fixing and importing again doesn't add the others twice.
+        _importText = result.Unmatched.Count > 0 ? string.Join("\n", result.Unmatched.Select(u => u.Text)) : null;
+        _importReplace = false;
+    }
+
+    private async Task OpenExportAsync()
+    {
+        _showExport = true;
+        _exportText = null;
+        await LoadExportTextAsync();
+    }
+
+    // ================================================================== settings
+
+    private async Task OpenSettings()
+    {
+        if (_deck is null) return;
+        if (_formats.Count == 0) _formats = await DeckRepo.GetFormatsAsync();
+        _settingsName = _deck.Name;
+        _settingsFormat = _deck.Format;
+        _settingsDescription = _deck.Description;
+        _settingsError = null;
+        _confirmDelete = false;
+        _showSettings = true;
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        var error = await MutateAsync(() => DeckRepo.UpdateAsync(DeckId, _settingsName, _settingsFormat, _settingsDescription), showInline: false);
+        if (error is null) _showSettings = false;
+        else _settingsError = error;
+    }
+
+    private async Task DuplicateAsync()
+    {
+        _busy = true;
+        try
+        {
+            var id = await DeckRepo.DuplicateAsync(DeckId);
+            _showSettings = false;
+            Nav.NavigateTo($"decks/{id}");
+        }
+        catch (Exception ex) when (IsDeckError(ex))
+        {
+            _settingsError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeleteDeckAsync()
+    {
+        _busy = true;
+        try
+        {
+            await DeckRepo.DeleteAsync(DeckId);
+            Nav.NavigateTo("decks");
+        }
+        catch (Exception ex) when (IsDeckError(ex))
+        {
+            _settingsError = ex.Message;
+            _busy = false;
+        }
+    }
+}

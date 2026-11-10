@@ -45,11 +45,34 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
     partial void OnQueryChanged(string value) => ScheduleSearch();
     partial void OnScryfallChanged(string value) => ScheduleSearch();
 
+    private bool _subscribed;
+
     public override Task OnAppearingAsync()
     {
+        if (!_subscribed) session.SignedOut += OnSignedOut;
+        _subscribed = true;
         // Price provider changed in settings → refresh prices of the current results.
         if (_loadedProvider is not null && _loadedProvider != session.Provider) ScheduleSearch(immediately: true);
         return Task.CompletedTask;
+    }
+
+    /// <summary>Back to the first-launch state so the next account never sees this one's results.</summary>
+    private void OnSignedOut()
+    {
+        _searchCts?.Cancel();
+        _searchCts = null;
+        PendingSearch = null;
+        _suppressSearch = true;
+        Query = "";
+        Scryfall = "";
+        _suppressSearch = false;
+        ShowScryfall = false;
+        Results.Clear();
+        _page = _totalPages = 0;
+        _loadedProvider = null;
+        ResultText = "Type a card name, a collector number, or scan a card.";
+        Error = null;
+        TargetDeck = null;
     }
 
     private void ScheduleSearch(bool immediately = false)
@@ -124,6 +147,12 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
     [RelayCommand]
     private async Task QuickAddAsync(CardItem item)
     {
+        if (TargetDeck is not null)
+        {
+            await AddToTargetDeckAsync(item);
+            return;
+        }
+
         var finish = item.Card.Finishes.FirstOrDefault() ?? "nonfoil";
         if (item.Card.Finishes.Count > 1)
         {
@@ -141,7 +170,10 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
         }, showBusy: false);
     }
 
-    /// <summary>Photo → on-device OCR → server recognition. One match opens the card; several are listed.</summary>
+    /// <summary>
+    /// Camera: live view that reads frames until the server recognises a card. Gallery: photo → on-device OCR →
+    /// server recognition. One match opens the card; several are listed.
+    /// </summary>
     [RelayCommand]
     private async Task ScanAsync(string? source)
     {
@@ -149,16 +181,30 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
         IsScanning = true;
         try
         {
-            var lines = await scanner.ScanAsync(fromGallery: source == "gallery");
-            if (lines is null) return; // cancelled
-            if (lines.Count == 0)
+            if (source != "gallery")
+            {
+                var live = await scanner.ScanLiveAsync((lines, ct) => api.RecognizeAsync(lines, session.Provider, ct));
+                switch (live.Outcome)
+                {
+                    case LiveScanOutcome.Cancelled:
+                        return;
+                    case LiveScanOutcome.Found:
+                        await ShowRecognizedAsync(live.Result!);
+                        return;
+                }
+                // The user picked "Gallery" in the live view: continue with the photo path below.
+            }
+
+            var photoLines = await scanner.ScanAsync(fromGallery: true);
+            if (photoLines is null) return; // cancelled
+            if (photoLines.Count == 0)
             {
                 await dialogs.AlertAsync("No text found", "Couldn't read any text. Take the photo straight from above, with the card filling most of the picture.");
                 return;
             }
 
             RecognizeResultDto? result = null;
-            if (!await RunAsync(async () => result = await api.RecognizeAsync(lines, session.Provider))) return;
+            if (!await RunAsync(async () => result = await api.RecognizeAsync(photoLines, session.Provider))) return;
 
             if (result is not { Found: true })
             {
@@ -167,15 +213,7 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
                 return;
             }
 
-            ShowCandidates(result);
-            var printing = result.SetCode is not null && result.Number is not null ? $" ({result.SetCode} #{result.Number})" : "";
-            if (result.Candidates.Count == 1)
-            {
-                if (Results[0].IsOwned) await HandleOwnedScanAsync(Results[0]);
-                else await OpenCardAsync(Results[0]);
-            }
-            else
-                await dialogs.ToastAsync($"Recognised {result.Name}{printing} – pick the printing");
+            await ShowRecognizedAsync(result);
         }
         catch (Exception ex) when (ex is not ApiException)
         {
@@ -185,6 +223,24 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
         {
             IsScanning = false;
         }
+    }
+
+    /// <summary>
+    /// A recognised card: lists its printings; a single printing opens (or, when owned, asks what to do; while adding to a
+    /// deck, goes into the deck).
+    /// </summary>
+    private async Task ShowRecognizedAsync(RecognizeResultDto result)
+    {
+        ShowCandidates(result);
+        var printing = result.SetCode is not null && result.Number is not null ? $" ({result.SetCode} #{result.Number})" : "";
+        if (result.Candidates.Count == 1)
+        {
+            if (TargetDeck is not null) await AddToTargetDeckAsync(Results[0]);
+            else if (Results[0].IsOwned) await HandleOwnedScanAsync(Results[0]);
+            else await OpenCardAsync(Results[0]);
+        }
+        else
+            await dialogs.ToastAsync($"Recognised {result.Name}{printing} – pick the printing");
     }
 
     private const string AddCopyOption = "Add a new copy";
@@ -273,5 +329,40 @@ public sealed partial class SearchViewModel(MoxApiClient api, AppSession session
         _totalPages = 1;
         _loadedProvider = session.Provider;
         ResultText = $"Scanned: {result.Name} – {result.Candidates.Count} printing{(result.Candidates.Count == 1 ? "" : "s")}";
+    }
+
+    // ------------------------------------------------------------ "Adding to deck" mode
+    // Entered from the deck page's "Add card" (parameters deckId, deckName): "+" and a single-result scan add the card
+    // to that deck instead of the collection. The banner's ✕ or signing out ends it.
+
+    /// <summary>The deck "+" and scans add to; null = normal mode (add to the collection).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsAddingToDeck), nameof(AddingToDeckText))]
+    private DeckTarget? _targetDeck;
+
+    public bool IsAddingToDeck => TargetDeck is not null;
+    public string AddingToDeckText => TargetDeck is { } deck ? $"Adding to {deck.Name}" : "";
+
+    public override void ApplyParameters(IDictionary<string, object> parameters)
+    {
+        if (!parameters.TryGetValue("deckId", out var value) || value is not long id) return;
+        var name = parameters.TryGetValue("deckName", out var n) && n is string s && s.Length > 0 ? s : "deck";
+        TargetDeck = new DeckTarget(id, name);
+    }
+
+    [RelayCommand]
+    private void StopAddingToDeck() => TargetDeck = null;
+
+    /// <summary>Adds one copy of the printing (its first finish, non-foil when it has one) to the target deck.</summary>
+    private async Task AddToTargetDeckAsync(CardItem item)
+    {
+        if (TargetDeck is not { } deck) return;
+        var finishes = item.Card.Finishes;
+        var finish = finishes.Contains("nonfoil") ? "nonfoil" : finishes.FirstOrDefault() ?? "nonfoil";
+        await RunAsync(async () =>
+        {
+            await api.AddDeckCardAsync(deck.Id, new AddDeckCardRequest(item.Card.Uuid, 1, finish), session.Provider);
+            await dialogs.ToastAsync($"Added {item.Name} to {deck.Name}");
+        }, showBusy: false);
     }
 }

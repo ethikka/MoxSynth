@@ -1,0 +1,121 @@
+.deck-stacks {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 1rem .75rem;
+    align-items: start;
+}
+
+.deck-stack-column {
+    min-width: 0;
+}
+
+.deck-stack-header {
+    display: flex;
+    gap: .5rem;
+    align-items: baseline;
+    font-weight: 600;
+    font-size: .875rem;
+    padding: .25rem .125rem;
+    margin-bottom: .375rem;
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+.deck-stack-muted {
+    color: var(--bs-secondary-color);
+    font-weight: 500;
+}
+
+.deck-stack-count {
+    font-variant-numeric: tabular-nums;
+}
+
+.deck-stack {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Each card is 63:88; all but the first overlap the one above so only its top 30px (the name bar) shows.
+   A percentage margin is relative to the stack's width, which is the card's width: 88 / 63 = 139.68%. */
+.deck-stack-card {
+    --deck-stack-strip: 30px;
+    position: relative;
+    display: block;
+    width: 100%;
+    aspect-ratio: 63 / 88;
+    padding: 0;
+    border: 0;
+    background: var(--bs-tertiary-bg);
+    border-radius: 4.5% / 3.22%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .35);
+    cursor: pointer;
+    text-align: left;
+    color: var(--bs-body-color);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.deck-stack-card + .deck-stack-card {
+    margin-top: calc(var(--deck-stack-strip) - 139.68%);
+}
+
+.deck-stack-card:hover, .deck-stack-card:focus-visible {
+    z-index: 5;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, .45);
+}
+
+.deck-stack-card:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 1px;
+}
+
+.deck-stack-illegal, .deck-stack-illegal:focus-visible {
+    outline: 2px solid var(--bs-danger);
+    outline-offset: 0;
+}
+
+.deck-stack-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.deck-stack-placeholder {
+    display: block;
+    height: 100%;
+    padding: .4rem .5rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: inherit;
+    font-size: .8rem;
+    font-weight: 600;
+    line-height: 1.2;
+    overflow: hidden;
+}
+
+.deck-stack-qty {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    padding: 0 .35rem;
+    border-radius: .5rem;
+    background: rgba(0, 0, 0, .75);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    line-height: 1.4;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Not owned at all: a red bar along the left edge of the visible strip, so it never covers the card name. */
+.deck-stack-missing {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 5px;
+    height: var(--deck-stack-strip);
+    border-top-left-radius: 4.5% 3.2%;
+    background: var(--bs-danger);
+    overflow: hidden;
+    font-size: 0;
+}

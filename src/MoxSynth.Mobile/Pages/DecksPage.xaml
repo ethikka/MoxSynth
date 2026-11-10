@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<pages:ViewModelPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                     xmlns:pages="clr-namespace:MoxSynth.Mobile.Pages"
+                     xmlns:vm="clr-namespace:MoxSynth.Client.ViewModels;assembly=MoxSynth.Client"
+                     x:Class="MoxSynth.Mobile.Pages.DecksPage"
+                     x:DataType="vm:DecksViewModel"
+                     Title="Decks">
+    <Grid RowDefinitions="Auto,*">
+        <Label Text="{Binding Error}" Style="{StaticResource Error}" IsVisible="{Binding HasError}" Margin="14,4" />
+
+        <RefreshView Grid.Row="1" IsRefreshing="{Binding IsRefreshing}" Command="{Binding RefreshCommand}">
+            <CollectionView ItemsSource="{Binding Decks}">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DeckSummaryItem">
+                        <Border Style="{StaticResource Row}">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnDeckTapped" />
+                            </Border.GestureRecognizers>
+                            <Grid ColumnDefinitions="56,*,Auto" ColumnSpacing="10">
+                                <!-- Cover: cropped art, a plain block when the deck has none -->
+                                <Border WidthRequest="56" HeightRequest="40" Padding="0" StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 4" BackgroundColor="{DynamicResource ThemeSurface2}"
+                                        VerticalOptions="Center">
+                                    <Image Source="{Binding CoverImageUrl}" Aspect="AspectFill" WidthRequest="56" HeightRequest="40" />
+                                </Border>
+                                <VerticalStackLayout Grid.Column="1" VerticalOptions="Center" Spacing="1">
+                                    <Label Text="{Binding Name}" FontAttributes="Bold" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                                </VerticalStackLayout>
+                                <Label Grid.Column="2" Text="Legal" FontSize="12" TextColor="{DynamicResource ThemeOk}"
+                                       VerticalOptions="Center" IsVisible="{Binding IsLegal}" />
+                                <Label Grid.Column="2" Text="Not legal" FontSize="12" TextColor="{DynamicResource ThemeBad}"
+                                       VerticalOptions="Center" IsVisible="{Binding IsNotLegal}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+                <CollectionView.EmptyView>
+                    <Label Text="No decks yet – create one in the web app." Style="{StaticResource Muted}"
+                           HorizontalTextAlignment="Center" Padding="30" />
+                </CollectionView.EmptyView>
+            </CollectionView>
+        </RefreshView>
+    </Grid>
+</pages:ViewModelPage>

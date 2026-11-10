@@ -164,6 +164,80 @@ public sealed class MoxApiClient(ITokenStore tokens, Func<HttpMessageHandler>? h
     public Task RestoreCopyAsync(long id, CancellationToken ct = default) =>
         SendAsync<object>(HttpMethod.Post, $"api/collection/{I(id)}/restore", null, authenticated: true, ct);
 
+    // ------------------------------------------------------------ decks
+
+    public Task<List<DeckSummaryDto>> GetDecksAsync(string? provider, CancellationToken ct = default) =>
+        GetAsync<List<DeckSummaryDto>>("api/decks" + Query(("provider", provider)), ct);
+
+    public Task<List<DeckFormatDto>> GetDeckFormatsAsync(CancellationToken ct = default) =>
+        GetAsync<List<DeckFormatDto>>("api/decks/formats", ct);
+
+    public Task<DeckDetailDto> CreateDeckAsync(CreateDeckRequest request, string? provider, CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Post, "api/decks" + Query(("provider", provider)), request, authenticated: true, ct);
+
+    public Task<DeckDetailDto> GetDeckAsync(long deckId, string? provider, CancellationToken ct = default) =>
+        GetAsync<DeckDetailDto>(DeckPath(deckId) + Query(("provider", provider)), ct);
+
+    public Task<DeckDetailDto> UpdateDeckAsync(long deckId, UpdateDeckRequest request, string? provider,
+        CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Put, DeckPath(deckId) + Query(("provider", provider)), request, authenticated: true, ct);
+
+    public Task DeleteDeckAsync(long deckId, CancellationToken ct = default) =>
+        SendAsync<object>(HttpMethod.Delete, DeckPath(deckId), null, authenticated: true, ct);
+
+    /// <summary>Copies the deck; returns the new deck.</summary>
+    public Task<DeckDetailDto> DuplicateDeckAsync(long deckId, string? provider, CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Post, DeckPath(deckId, "/duplicate") + Query(("provider", provider)), null,
+            authenticated: true, ct);
+
+    public Task<DeckDetailDto> AddDeckCardAsync(long deckId, AddDeckCardRequest request, string? provider,
+        CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Post, DeckPath(deckId, "/cards") + Query(("provider", provider)), request,
+            authenticated: true, ct);
+
+    /// <summary>Sets a card's quantity; 0 removes it from the deck.</summary>
+    public Task<DeckDetailDto> SetDeckCardQuantityAsync(long deckId, long deckCardId, int quantity, string? provider,
+        CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Put, DeckPath(deckId, $"/cards/{I(deckCardId)}/quantity") + Query(("provider", provider)),
+            new SetDeckCardQuantityRequest(quantity), authenticated: true, ct);
+
+    /// <summary>Replaces a card's categories (names, primary first; empty = its type category).</summary>
+    public Task<DeckDetailDto> SetDeckCardCategoriesAsync(long deckId, long deckCardId, IReadOnlyList<string> categories,
+        string? provider, CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Put, DeckPath(deckId, $"/cards/{I(deckCardId)}/categories") + Query(("provider", provider)),
+            new SetDeckCardCategoriesRequest(categories), authenticated: true, ct);
+
+    public Task<DeckDetailDto> ChangeDeckCardPrintingAsync(long deckId, long deckCardId, ChangeDeckCardPrintingRequest request,
+        string? provider, CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Put, DeckPath(deckId, $"/cards/{I(deckCardId)}/printing") + Query(("provider", provider)),
+            request, authenticated: true, ct);
+
+    public Task<DeckDetailDto> AddDeckCategoryAsync(long deckId, CreateDeckCategoryRequest request, string? provider,
+        CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Post, DeckPath(deckId, "/categories") + Query(("provider", provider)), request,
+            authenticated: true, ct);
+
+    /// <summary>Renames, (un)counts and/or moves a category (only the fields that are set).</summary>
+    public Task<DeckDetailDto> UpdateDeckCategoryAsync(long deckId, long categoryId, UpdateDeckCategoryRequest request,
+        string? provider, CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Put, DeckPath(deckId, $"/categories/{I(categoryId)}") + Query(("provider", provider)),
+            request, authenticated: true, ct);
+
+    public Task<DeckDetailDto> DeleteDeckCategoryAsync(long deckId, long categoryId, string? provider,
+        CancellationToken ct = default) =>
+        SendAsync<DeckDetailDto>(HttpMethod.Delete, DeckPath(deckId, $"/categories/{I(categoryId)}") + Query(("provider", provider)),
+            null, authenticated: true, ct);
+
+    public Task<DeckImportResultDto> ImportDeckTextAsync(long deckId, string text, bool replace, string? provider,
+        CancellationToken ct = default) =>
+        SendAsync<DeckImportResultDto>(HttpMethod.Post, DeckPath(deckId, "/import") + Query(("provider", provider)),
+            new ImportDeckTextRequest(text, replace), authenticated: true, ct);
+
+    public async Task<string> ExportDeckTextAsync(long deckId, CancellationToken ct = default) =>
+        (await GetAsync<DeckTextDto>(DeckPath(deckId, "/export"), ct)).Text;
+
+    private static string DeckPath(long deckId, string suffix = "") => $"api/decks/{I(deckId)}{suffix}";
+
     // ------------------------------------------------------------ plumbing
 
     private Task<T> GetAsync<T>(string path, CancellationToken ct) => SendAsync<T>(HttpMethod.Get, path, null, authenticated: true, ct);

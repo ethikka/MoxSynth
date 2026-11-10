@@ -1,0 +1,306 @@
+@page "/decks"
+@using MoxSynth.Decks
+@inject DeckRepository DeckRepo
+@inject ArchidektDeckImport ArchidektImport
+@inject PriceRepository Prices
+@inject PriceSettings PriceSettings
+@inject NavigationManager Nav
+@implements IDisposable
+
+<PageTitle>Decks · MoxSynth</PageTitle>
+
+<div class="d-flex align-items-center mb-3">
+    <h1 class="h3 mb-0">Decks</h1>
+    <div class="ms-auto d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" @onclick="OpenArchidekt">Import from Archidekt</button>
+        <button type="button" class="btn btn-primary" @onclick="OpenNewDeckAsync">New deck</button>
+    </div>
+</div>
+
+@if (_error is not null)
+{
+    <div class="alert alert-danger py-2">@_error</div>
+}
+
+@if (_decks is null)
+{
+    <p class="text-muted">
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        Loading…
+    </p>
+}
+else if (_decks.Count == 0)
+{
+    <div class="card card-body text-center py-5">
+        <p class="h5 mb-3">Start your first deck</p>
+        <div>
+            <button type="button" class="btn btn-primary" @onclick="OpenNewDeckAsync">New deck</button>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
+        @foreach (var deck in _decks)
+        {
+            <div class="col">
+                <a class="card h-100 deck-tile text-reset text-decoration-none" href="decks/@deck.Id">
+                    @if (deck.CoverImageUrl is { } cover)
+                    {
+                        <img class="card-img-top deck-tile-cover" src="@cover" loading="lazy" alt="" />
+                    }
+                    else
+                    {
+                        <div class="card-img-top deck-tile-cover deck-tile-cover-empty"></div>
+                    }
+                    <div class="card-body">
+                        <div class="fw-bold text-truncate" title="@deck.Name">@deck.Name</div>
+                        <div class="mb-1"><span class="badge text-bg-secondary">@DeckFormats.Label(deck.Format)</span></div>
+                        <div class="small text-body-secondary mb-2">
+                            @(FormatValue(deck.Value, deck.Currency) is { } value ? $"{deck.CardCount} cards · {value}" : $"{deck.CardCount} cards")
+                        </div>
+                        @if (deck.IsLegal)
+                        {
+                            <span class="badge text-bg-success">Legal</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-danger">Not legal</span>
+                        }
+                    </div>
+                </a>
+            </div>
+        }
+    </div>
+}
+
+@if (_showNew)
+{
+    <div class="scanner-backdrop" @onclick="CloseNewDeck">
+        <div class="card scanner-dialog deck-dialog" @onclick:stopPropagation="true">
+            <form @onsubmit="CreateAsync">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>New deck</strong>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseNewDeck"></button>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label small mb-0" for="newDeckName">Name</label>
+                        <input id="newDeckName" class="form-control" autocomplete="off" @bind="_newName" @bind:event="oninput" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small mb-0" for="newDeckFormat">Format</label>
+                        <select id="newDeckFormat" class="form-select" @bind="_newFormat">
+                            @foreach (var format in _formats)
+                            {
+                                <option value="@format">@DeckFormats.Label(format)</option>
+                            }
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label small mb-0" for="newDeckDescription">Description (optional)</label>
+                        <textarea id="newDeckDescription" class="form-control" rows="3" @bind="_newDescription"></textarea>
+                    </div>
+                    @if (_newError is not null)
+                    {
+                        <div class="text-danger small mt-2" role="alert">@_newError</div>
+                    }
+                </div>
+                <div class="card-footer d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseNewDeck">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" disabled="@(_busy || string.IsNullOrWhiteSpace(_newName))">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@if (_showArchidekt)
+{
+    <div class="scanner-backdrop" @onclick="CloseArchidekt">
+        <div class="card scanner-dialog deck-dialog" @onclick:stopPropagation="true">
+            <form @onsubmit="ImportArchidektAsync">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>Import from Archidekt</strong>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="CloseArchidekt"></button>
+                </div>
+                <div class="card-body">
+                    <label class="form-label small mb-0" for="archidektUrl">Archidekt deck link</label>
+                    <input id="archidektUrl" class="form-control" type="text" inputmode="url" autocomplete="off"
+                           placeholder="https://archidekt.com/decks/123456/my-deck" disabled="@(_archidektResult is not null)"
+                           @bind="_archidektUrl" @bind:event="oninput" />
+                    <div class="form-text">The deck must be public. Name, format and description are taken from Archidekt.</div>
+                    @if (_archidektError is not null)
+                    {
+                        <div class="text-danger small mt-2" role="alert">@_archidektError</div>
+                    }
+                    @if (_archidektResult is { } imported)
+                    {
+                        var result = imported.Import;
+                        <div class="mt-3 small">
+                            <div class="fw-semibold">Created “@imported.DeckName” with @result.Added @(result.Added == 1 ? "card" : "cards")</div>
+                            @if (result.Warnings.Count > 0)
+                            {
+                                <ul class="text-warning-emphasis mb-1">
+                                    @foreach (var w in result.Warnings)
+                                    {
+                                        <li>Line @w.Line: @w.Text — @w.Problem</li>
+                                    }
+                                </ul>
+                            }
+                            @if (result.Unmatched.Count > 0)
+                            {
+                                <div class="text-danger mt-1">Not imported:</div>
+                                <ul class="text-danger mb-0">
+                                    @foreach (var u in result.Unmatched)
+                                    {
+                                        <li>Line @u.Line: <code>@u.Text</code> — @u.Problem</li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    }
+                </div>
+                <div class="card-footer d-flex justify-content-end gap-2">
+                    @if (_archidektResult is { } done)
+                    {
+                        <button type="button" class="btn btn-primary btn-sm" @onclick="() => OpenDeck(done.DeckId)">Open deck</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CloseArchidekt">Cancel</button>
+                        <button type="submit" class="btn btn-primary btn-sm" disabled="@(_busy || string.IsNullOrWhiteSpace(_archidektUrl))">
+                            @if (_busy)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            }
+                            Import
+                        </button>
+                    }
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    private IReadOnlyList<DeckSummary>? _decks;
+    private IReadOnlyList<string> _formats = [];
+    private string? _error;
+
+    private bool _showNew;
+    private bool _busy;
+    private string _newName = "";
+    private string _newFormat = "commander";
+    private string? _newDescription;
+    private string? _newError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        PriceSettings.Changed += OnPriceProviderChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _decks = await DeckRepo.ListAsync(Prices.IsAvailable ? PriceSettings.Provider : null);
+            _error = null;
+        }
+        catch (Exception ex) when (ex is DeckNotFoundException or ArgumentException or InvalidOperationException)
+        {
+            _decks ??= [];
+            _error = ex.Message;
+        }
+    }
+
+    private void OnPriceProviderChanged() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => PriceSettings.Changed -= OnPriceProviderChanged;
+
+    internal static string? FormatValue(double? value, string? currency) =>
+        value is { } v ? PriceProviders.CurrencySymbol(currency) + v.ToString("N2", System.Globalization.CultureInfo.InvariantCulture) : null;
+
+    private async Task OpenNewDeckAsync()
+    {
+        if (_formats.Count == 0) _formats = await DeckRepo.GetFormatsAsync();
+        _newName = "";
+        _newDescription = null;
+        _newFormat = _formats.Contains("commander") ? "commander" : _formats.FirstOrDefault() ?? DeckFormats.Casual;
+        _newError = null;
+        _busy = false;
+        _showNew = true;
+    }
+
+    private void CloseNewDeck() => _showNew = false;
+
+    // Import from Archidekt: creates a new deck, then opens it (or first lists what couldn't be imported).
+    private bool _showArchidekt;
+    private string? _archidektUrl;
+    private string? _archidektError;
+    private ArchidektImportResult? _archidektResult;
+
+    private void OpenArchidekt()
+    {
+        _archidektUrl = null;
+        _archidektError = null;
+        _archidektResult = null;
+        _busy = false;
+        _showArchidekt = true;
+    }
+
+    private void CloseArchidekt()
+    {
+        if (_busy) return;
+        _showArchidekt = false;
+        if (_archidektResult is not null) _ = InvokeAsync(async () => { await LoadAsync(); StateHasChanged(); });
+    }
+
+    private void OpenDeck(long deckId) => Nav.NavigateTo($"decks/{deckId}");
+
+    private async Task ImportArchidektAsync()
+    {
+        if (_busy || _archidektResult is not null || string.IsNullOrWhiteSpace(_archidektUrl)) return;
+        _busy = true;
+        _archidektError = null;
+        try
+        {
+            var result = await ArchidektImport.ImportNewAsync(_archidektUrl);
+            if (result.Import.Unmatched.Count == 0 && result.Import.Warnings.Count == 0)
+            {
+                Nav.NavigateTo($"decks/{result.DeckId}");
+                return;
+            }
+            _archidektResult = result;
+        }
+        catch (Exception ex) when (ex is DeckNotFoundException or ArgumentException or InvalidOperationException)
+        {
+            _archidektError = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_busy || string.IsNullOrWhiteSpace(_newName)) return;
+        _busy = true;
+        try
+        {
+            var id = await DeckRepo.CreateAsync(_newName, _newFormat, _newDescription);
+            Nav.NavigateTo($"decks/{id}");
+        }
+        catch (Exception ex) when (ex is DeckNotFoundException or ArgumentException or InvalidOperationException)
+        {
+            _newError = ex.Message;
+            _busy = false;
+        }
+    }
+}

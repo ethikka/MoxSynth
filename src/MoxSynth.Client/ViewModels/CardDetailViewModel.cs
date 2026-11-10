@@ -128,6 +128,37 @@ public sealed partial class CardDetailViewModel(MoxApiClient api, AppSession ses
         });
     }
 
+    /// <summary>Adds the shown printing (selected finish, one copy) to a deck; the server picks its category.</summary>
+    [RelayCommand]
+    private async Task AddToDeckAsync()
+    {
+        if (Card is null) return;
+        var card = Card;
+        var finish = SelectedFinish?.Value ?? card.Finishes.FirstOrDefault() ?? "nonfoil";
+
+        List<DeckSummaryDto>? decks = null;
+        if (!await RunAsync(async () => decks = await api.GetDecksAsync(session.Provider), showBusy: false)) return;
+        if (decks!.Count == 0)
+        {
+            await dialogs.AlertAsync("No decks yet", "Decks are created in the web app. Create one there, then add cards to it from here.");
+            return;
+        }
+
+        var ordered = decks.OrderByDescending(d => d.UpdatedAt).ToList();
+        var labels = ordered.Select(d => d.Name).ToList();
+        // Numbered when names repeat, so every option is distinct.
+        if (labels.Distinct().Count() != labels.Count) labels = ordered.Select((d, i) => $"{i + 1}. {d.Name}").ToList();
+        var chosen = await dialogs.ChooseAsync($"Add {card.Name} to", labels);
+        if (chosen is null) return;
+        var deck = ordered[labels.IndexOf(chosen)];
+
+        await RunAsync(async () =>
+        {
+            await api.AddDeckCardAsync(deck.Id, new AddDeckCardRequest(card.Uuid, 1, finish), session.Provider);
+            await dialogs.ToastAsync($"Added {card.Name} to {deck.Name}");
+        }, showBusy: false);
+    }
+
     [RelayCommand]
     private async Task RemoveCopyAsync(CopyItem item)
     {

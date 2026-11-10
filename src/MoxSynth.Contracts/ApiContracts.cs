@@ -25,6 +25,8 @@ public static class ApiErrorCodes
     public const string NotFound = "not-found";
     public const string Unauthorized = "unauthorized";
     public const string Invalid = "invalid";
+    /// <summary>The request breaks a rule (e.g. deleting the Sideboard category).</summary>
+    public const string Conflict = "conflict";
 }
 
 /// <summary>GET /api/me – the signed-in profile and server facts.</summary>
@@ -222,3 +224,146 @@ public sealed record RecognizeResultDto(
     IReadOnlyList<CardSummaryDto> Candidates,
     string? TitleText,
     string? BottomText);
+
+// ---------------------------------------------------------------- decks
+
+/// <summary>GET /api/decks/formats – deck formats ("casual" plus the MTGJSON legality keys).</summary>
+public sealed record DeckFormatDto(
+    string Id,
+    string Label,
+    /// <summary>Has a Commander category, singleton and colour-identity rules.</summary>
+    bool IsCommanderStyle,
+    /// <summary>Exact deck size (commander included) of a commander-style format, else null.</summary>
+    int? CommanderDeckSize)
+{
+    public override string ToString() => Label; // pickers
+}
+
+/// <summary>GET /api/decks – one entry per deck, most recently updated first.</summary>
+public sealed record DeckSummaryDto(
+    long Id,
+    string Name,
+    string Format,
+    /// <summary>Sum of quantities of cards whose primary category counts in the deck.</summary>
+    int CardCount,
+    IReadOnlyList<string> CommanderNames,
+    string? CoverImageUrl,
+    DateTime UpdatedAt,
+    /// <summary>Value of the counted cards at the requested provider (null without prices).</summary>
+    double? Value,
+    string? Currency,
+    bool IsLegal);
+
+/// <summary>GET /api/decks/{id} – and the answer of every deck mutation.</summary>
+public sealed record DeckDetailDto(
+    long Id,
+    string Name,
+    string Format,
+    string? Description,
+    DateTime CreatedAt,
+    DateTime UpdatedAt,
+    /// <summary>Ordered by position.</summary>
+    IReadOnlyList<DeckCategoryDto> Categories,
+    /// <summary>Ordered by primary category position, then name.</summary>
+    IReadOnlyList<DeckCardDto> Cards,
+    DeckLegalityDto Legality,
+    double? Value,
+    string? Currency,
+    /// <summary>Counted cards covered by the collection (per name: min(deck quantity, owned copies of any printing)).</summary>
+    int OwnedCount,
+    int CardCount,
+    IReadOnlyList<string> CommanderNames,
+    string? CoverImageUrl);
+
+public sealed record DeckCategoryDto(
+    long Id,
+    string Name,
+    int Position,
+    bool CountsInDeck,
+    /// <summary>"commander", "sideboard", "maybeboard" for the built-in categories, else null.</summary>
+    string? Role,
+    /// <summary>Sum of quantities of the cards listed here (whose primary category this is).</summary>
+    int CardCount);
+
+public sealed record DeckCardDto(
+    long DeckCardId,
+    string CardUuid,
+    string Name,
+    string SetCode,
+    string Number,
+    string Finish,
+    int Quantity,
+    /// <summary>Category ids, primary (where the card is listed) first.</summary>
+    IReadOnlyList<long> CategoryIds,
+    string? ManaCost,
+    double ManaValue,
+    IReadOnlyList<string> Colors,
+    IReadOnlyList<string> ColorIdentity,
+    string? TypeLine,
+    IReadOnlyList<string> Types,
+    string? Rarity,
+    string? ImageUrl,
+    string? SmallImageUrl,
+    /// <summary>Unit price for the finish at the requested provider.</summary>
+    double? Price,
+    /// <summary>Owned copies of this printing in this finish.</summary>
+    int OwnedExact,
+    /// <summary>Owned copies of any printing with the same name.</summary>
+    int OwnedAny,
+    /// <summary>Why this card makes the deck illegal, null when fine.</summary>
+    string? IllegalReason)
+{
+    public long? PrimaryCategoryId => CategoryIds.Count > 0 ? CategoryIds[0] : null;
+}
+
+public sealed record DeckLegalityDto(
+    bool IsLegal,
+    /// <summary>Short human-readable problems ("97 of 100 cards", "Sol Ring: banned in Modern").</summary>
+    IReadOnlyList<string> Problems,
+    /// <summary>Per deck card id: why that card is illegal (only cards with a problem).</summary>
+    IReadOnlyDictionary<long, string> CardReasons);
+
+/// <summary>POST /api/decks</summary>
+public sealed record CreateDeckRequest(string Name, string Format, string? Description = null);
+
+/// <summary>PUT /api/decks/{id}</summary>
+public sealed record UpdateDeckRequest(string Name, string Format, string? Description = null);
+
+/// <summary>
+/// POST /api/decks/{id}/cards. <see cref="Category"/> is found by name (case-insensitively; "Sideboard", "Maybeboard",
+/// "Commander" also find the renamed built-in one) or created; null = the card's type category.
+/// </summary>
+public sealed record AddDeckCardRequest(string CardUuid, int Quantity = 1, string Finish = "nonfoil", string? Category = null);
+
+/// <summary>PUT /api/decks/{id}/cards/{deckCardId}/quantity – 0 removes the card.</summary>
+public sealed record SetDeckCardQuantityRequest(int Quantity);
+
+/// <summary>PUT /api/decks/{id}/cards/{deckCardId}/categories – names, primary first; missing ones are created; empty = type category.</summary>
+public sealed record SetDeckCardCategoriesRequest(IReadOnlyList<string> Categories);
+
+/// <summary>PUT /api/decks/{id}/cards/{deckCardId}/printing – another printing of the same name; Finish null keeps it when possible.</summary>
+public sealed record ChangeDeckCardPrintingRequest(string CardUuid, string? Finish = null);
+
+/// <summary>POST /api/decks/{id}/categories</summary>
+public sealed record CreateDeckCategoryRequest(string Name, bool CountsInDeck = true);
+
+/// <summary>PUT /api/decks/{id}/categories/{categoryId} – only the fields that are set change (name, then counts, then position).</summary>
+public sealed record UpdateDeckCategoryRequest(string? Name = null, bool? CountsInDeck = null, int? Position = null);
+
+/// <summary>POST /api/decks/{id}/import – a text decklist; Replace removes all cards and non-built-in categories first.</summary>
+public sealed record ImportDeckTextRequest(string Text, bool Replace = false);
+
+public sealed record DeckImportLineDto(int Line, string Text, string Problem);
+
+public sealed record DeckImportResultDto(
+    /// <summary>Cards added (sum of quantities).</summary>
+    int Added,
+    /// <summary>Lines that could not be read or matched (nothing added for them).</summary>
+    IReadOnlyList<DeckImportLineDto> Unmatched,
+    /// <summary>Lines added, but not quite as written.</summary>
+    IReadOnlyList<DeckImportLineDto> Warnings,
+    /// <summary>The deck after the import.</summary>
+    DeckDetailDto Deck);
+
+/// <summary>GET /api/decks/{id}/export</summary>
+public sealed record DeckTextDto(string Text);

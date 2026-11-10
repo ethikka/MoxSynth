@@ -23,7 +23,25 @@ public sealed partial class HomeViewModel(MoxApiClient api, AppSession session, 
 
     public ObservableCollection<HistoryItem> Recent { get; } = [];
 
-    public override Task OnAppearingAsync() => LoadAsync(showBusy: Stats is null);
+    private bool _subscribed;
+
+    public override Task OnAppearingAsync()
+    {
+        if (!_subscribed) session.SignedOut += OnSignedOut;
+        _subscribed = true;
+        return LoadAsync(showBusy: Stats is null);
+    }
+
+    /// <summary>Back to the first-launch state so the next account never sees this one's data.</summary>
+    private void OnSignedOut()
+    {
+        Stats = null;
+        Greeting = "";
+        ValueText = "–";
+        ValueNote = null;
+        Recent.Clear();
+        Error = null;
+    }
 
     [RelayCommand]
     private Task RefreshAsync() => LoadAsync(showBusy: false);

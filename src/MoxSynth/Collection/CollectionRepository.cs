@@ -136,6 +136,22 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
         return rows.ToDictionary(r => r.CardUuid, r => r.Count);
     }
 
+    /// <summary>Owned copies per uuid with the foil/etched share (uuids without copies are omitted).</summary>
+    public async Task<Dictionary<string, (int Total, int Foil)>> GetOwnedFinishCountsAsync(IEnumerable<string> cardUuids, CancellationToken ct = default)
+    {
+        var ids = cardUuids.Distinct().ToArray();
+        if (ids.Length == 0) return new();
+
+        await using var conn = Open();
+        var rows = await conn.QueryAsync<(string CardUuid, long Total, long Foil)>(new CommandDefinition("""
+            SELECT card_uuid, COUNT(*), SUM(CASE WHEN finish IN ('foil', 'etched') THEN 1 ELSE 0 END)
+            FROM collection_cards
+            WHERE removed_at IS NULL AND card_uuid IN @ids
+            GROUP BY card_uuid
+            """, new { ids }, cancellationToken: ct));
+        return rows.ToDictionary(r => r.CardUuid, r => ((int)r.Total, (int)r.Foil));
+    }
+
     public async Task<CollectionPage> GetGroupsAsync(CollectionQuery query, CancellationToken ct = default)
     {
         var page = Math.Max(1, query.Page);
