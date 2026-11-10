@@ -550,3 +550,12 @@ h1:focus {
 .theme-neon .price-up .price-change, .theme-neon .price-up .sparkline polyline { color: var(--neon-lime); stroke: var(--neon-lime); }
 .theme-neon .price-down .price-change, .theme-neon .price-down .sparkline polyline { color: var(--neon-pink); stroke: var(--neon-pink); }
 .theme-neon .sparkline polyline { filter: drop-shadow(0 0 2px currentColor); }
+
+/* Collection: removed copies (when "Show removed cards" is on) */
+.collection-removed > td {
+    opacity: .55;
+}
+
+.collection-removed > td:first-child img {
+    filter: grayscale(1);
+}

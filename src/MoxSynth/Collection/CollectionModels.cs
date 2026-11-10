@@ -106,6 +106,7 @@ public sealed class CollectionGroup
 {
     private DateTime _firstAddedAt;
     private DateTime _lastAddedAt;
+    private DateTime? _lastRemovedAt;
 
     public string CardUuid { get; set; } = "";
     public string Name { get; set; } = "";
@@ -115,6 +116,13 @@ public sealed class CollectionGroup
     public CardCondition Condition { get; set; }
     public string Language { get; set; } = "";
     public long Quantity { get; set; }
+
+    /// <summary>True for a group of removed copies (only returned with <see cref="CollectionQuery.IncludeRemoved"/>).</summary>
+    public bool IsRemoved { get; set; }
+    /// <summary>Most recent removal in a removed group.</summary>
+    public DateTime? LastRemovedAt { get => _lastRemovedAt; set => _lastRemovedAt = SqliteTime.AsUtc(value); }
+    /// <summary>Distinct removal reasons of a removed group, e.g. "Sold, Traded".</summary>
+    public string? RemovalReasons { get; set; }
 
     public DateTime FirstAddedAt { get => _firstAddedAt; set => _firstAddedAt = SqliteTime.AsUtc(value); }
     public DateTime LastAddedAt { get => _lastAddedAt; set => _lastAddedAt = SqliteTime.AsUtc(value); }
@@ -130,6 +138,8 @@ public sealed class CollectionQuery
     public CollectionSort Sort { get; set; } = CollectionSort.Name;
     /// <summary>Optional Scryfall-syntax filter (same syntax as on the Search page).</summary>
     public string? Scryfall { get; set; }
+    /// <summary>Also returns groups of removed copies (as separate groups); ignored with <see cref="AsOf"/>.</summary>
+    public bool IncludeRemoved { get; set; }
     /// <summary>When set, shows the collection as it was at this UTC moment.</summary>
     public DateTime? AsOf { get; set; }
     public int Page { get; set; } = 1;
@@ -143,6 +153,8 @@ public sealed record CollectionPage(PagedResult<CollectionGroup> Groups, long To
     public string? Currency { get; init; }
     /// <summary>Matching copies without a price at the chosen provider.</summary>
     public long UnpricedCopies { get; init; }
+    /// <summary>Removed copies among the groups (0 unless <see cref="CollectionQuery.IncludeRemoved"/>).</summary>
+    public long RemovedCopies { get; init; }
 }
 
 public enum CollectionSort

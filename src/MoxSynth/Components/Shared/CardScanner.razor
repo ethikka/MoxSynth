@@ -28,6 +28,20 @@
                     </div>
                 }
 
+                @if (_cameras.Count > 1)
+                {
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <label class="form-label small mb-0 text-nowrap" for="scanner-camera">Camera</label>
+                        <select id="scanner-camera" class="form-select form-select-sm" value="@_currentCamera"
+                                @onchange="SwitchCameraAsync">
+                            @foreach (var camera in _cameras)
+                            {
+                                <option value="@camera.Id">@camera.Label</option>
+                            }
+                        </select>
+                    </div>
+                }
+
                 <p class="small mb-1 mt-2">
                     @if (_error is not null)
                     {
@@ -72,6 +86,9 @@
     private string? _lastBottom;
     private CardRecognition? _previous; // live scanning: require the same result twice unless very confident
 
+    private IReadOnlyList<CameraOption> _cameras = [];
+    private string? _currentCamera;
+
     private ElementReference _video;
     private ElementReference _guide;
     private ElementReference _file;
@@ -96,9 +113,31 @@
     {
         if (!_startPending || !_open) return;
         _startPending = false;
-        _error = await JS.InvokeAsync<string?>("moxScanner.start", _video, _guide, _self);
-        if (_error is not null) StateHasChanged();
+        await StartCameraAsync(null);
     }
+
+    /// <summary>Starts the camera (null = the one used last time) and refreshes the camera list.</summary>
+    private async Task StartCameraAsync(string? deviceId)
+    {
+        _error = await JS.InvokeAsync<string?>("moxScanner.start", _video, _guide, _self, deviceId);
+        if (_error is null)
+        {
+            var list = await JS.InvokeAsync<CameraList>("moxScanner.cameras");
+            _cameras = list.Cameras;
+            _currentCamera = list.Current;
+        }
+        StateHasChanged();
+    }
+
+    private async Task SwitchCameraAsync(ChangeEventArgs e)
+    {
+        if (e.Value is not string id || id == _currentCamera) return;
+        _previous = null;
+        await StartCameraAsync(id);
+    }
+
+    private sealed record CameraOption(string Id, string Label);
+    private sealed record CameraList(string? Current, IReadOnlyList<CameraOption> Cameras);
 
     private async Task ScanNowAsync() => await JS.InvokeVoidAsync("moxScanner.scanNow", _video, _self);
 

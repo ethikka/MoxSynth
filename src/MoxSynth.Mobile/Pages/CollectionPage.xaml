@@ -8,6 +8,7 @@
                      x:DataType="vm:CollectionViewModel"
                      Title="Collection">
     <ContentPage.ToolbarItems>
+        <ToolbarItem Text="{Binding ShowRemovedText}" Order="Secondary" Command="{Binding ToggleRemovedCommand}" />
         <ToolbarItem Text="Scryfall syntax" Order="Secondary" Clicked="OnToggleScryfall" />
     </ContentPage.ToolbarItems>
 
@@ -27,7 +28,7 @@
                             RemainingItemsThresholdReachedCommand="{Binding LoadMoreCommand}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="vm:GroupItem">
-                        <Border Style="{StaticResource Row}">
+                        <Border Style="{StaticResource Row}" Opacity="{Binding IsRemoved, Converter={StaticResource Dimmed}}">
                             <Border.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnGroupTapped" />
                             </Border.GestureRecognizers>
@@ -38,6 +39,8 @@
                                     <Label FormattedText="{Binding ManaCost, Converter={StaticResource ManaCost}}"
                                            IsVisible="{Binding ManaCost, Converter={StaticResource IsNotNull}}" />
                                     <Label Text="{Binding Subtitle}" Style="{StaticResource Muted}" LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding RemovedText}" FontSize="12" TextColor="{DynamicResource ThemeBad}"
+                                           IsVisible="{Binding IsRemoved}" LineBreakMode="TailTruncation" />
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="2" VerticalOptions="Center"
                                                      Opacity="{Binding Price.IsStale, Converter={StaticResource Dimmed}}">
@@ -50,9 +53,11 @@
                                            IsVisible="{Binding ValueText, Converter={StaticResource IsNotNull}}" />
                                 </VerticalStackLayout>
                                 <VerticalStackLayout Grid.Column="3" VerticalOptions="Center" Spacing="2">
-                                    <Button Text="+" Style="{StaticResource Small}" HeightRequest="30" Clicked="OnIncrementClicked" />
+                                    <Button Text="+" Style="{StaticResource Small}" HeightRequest="30" Clicked="OnIncrementClicked"
+                                            IsVisible="{Binding IsOwned}" />
                                     <Label Text="{Binding Quantity}" FontAttributes="Bold" HorizontalTextAlignment="Center" />
-                                    <Button Text="−" Style="{StaticResource Small}" HeightRequest="30" Clicked="OnDecrementClicked" />
+                                    <Button Text="−" Style="{StaticResource Small}" HeightRequest="30" Clicked="OnDecrementClicked"
+                                            IsVisible="{Binding IsOwned}" />
                                 </VerticalStackLayout>
                             </Grid>
                         </Border>

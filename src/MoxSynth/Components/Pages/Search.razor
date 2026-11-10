@@ -208,6 +208,7 @@ else if (_result is not null)
 
 <Toast @ref="_toast" />
 <CardScanner @ref="_scanner" OnRecognized="ApplyScan" />
+<OwnedScanDialog @ref="_ownedDialog" OnChanged="OnOwnedChanged" />
 
 @code {
     [SupplyParameterFromQuery(Name = "q")] public string? Q { get; set; }
@@ -230,6 +231,7 @@ else if (_result is not null)
     private bool _numberMode;
     private Toast? _toast;
     private CardScanner? _scanner;
+    private OwnedScanDialog? _ownedDialog;
 
     // Search-as-you-type state.
     private CancellationTokenSource? _debounce;
@@ -371,7 +373,11 @@ else if (_result is not null)
     }
 
     /// <summary>A scanned card: show exactly that card (and printing, when set + number were readable).</summary>
-    private void ApplyScan(CardRecognition card)
+    /// <remarks>
+    /// When the scan narrows it down to a single printing that is already in the collection, a dialog offers to
+    /// add another copy or remove an existing one.
+    /// </remarks>
+    private async Task ApplyScan(CardRecognition card)
     {
         _debounce?.Cancel();
         _colors.Clear();
@@ -385,6 +391,23 @@ else if (_result is not null)
 
         var printing = card.IsExactPrinting ? $" ({card.SetCode} #{card.Number})" : card.SetCode is not null ? $" ({card.SetCode})" : "";
         _toast?.Show($"Recognised {card.Name}{printing}");
+
+        var matches = await Cards.SearchAsync(new CardSearchQuery
+        {
+            Scryfall = $"!\"{card.Name.Replace("\"", "")}\"",
+            SetCode = card.SetCode,
+            Name = card.Number,
+            PageSize = 2,
+        });
+        if (matches.TotalCount == 1 && _ownedDialog is not null)
+            await _ownedDialog.ShowIfOwnedAsync(matches.Items[0]);
+    }
+
+    private void OnOwnedChanged((string Message, string Kind, string CardUuid, long Owned) change)
+    {
+        if (change.Owned > 0) _owned[change.CardUuid] = change.Owned;
+        else _owned.Remove(change.CardUuid);
+        _toast?.Show(change.Message, change.Kind);
     }
 
     private void Clear()

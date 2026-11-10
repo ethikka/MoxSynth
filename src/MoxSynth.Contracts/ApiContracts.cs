@@ -160,14 +160,21 @@ public sealed record CollectionGroupDto(
     string? ManaCost,
     string? SmallImageUrl,
     PriceDto? Price,
-    double? Value);
+    double? Value,
+    /// <summary>A group of removed copies (only with ?removed=true).</summary>
+    bool IsRemoved = false,
+    DateTime? LastRemovedAt = null,
+    /// <summary>Distinct removal reasons, e.g. "Sold, Traded".</summary>
+    string? RemovalReasons = null);
 
 public sealed record CollectionPageDto(
     PageDto<CollectionGroupDto> Groups,
     long TotalCopies,
     double? TotalValue,
     string? Currency,
-    long UnpricedCopies);
+    long UnpricedCopies,
+    /// <summary>Removed copies among the groups (0 unless ?removed=true). TotalCopies/TotalValue are owned copies only.</summary>
+    long RemovedCopies = 0);
 
 /// <summary>GET /api/stats</summary>
 public sealed record StatsDto(

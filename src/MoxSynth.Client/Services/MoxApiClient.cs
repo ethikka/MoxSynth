@@ -148,9 +148,9 @@ public sealed class MoxApiClient(ITokenStore tokens, Func<HttpMessageHandler>? h
             new RecognizeRequest(lines), authenticated: true, ct);
 
     public Task<CollectionPageDto> GetCollectionAsync(string? query, string? scryfall, string? sort, string? provider,
-        int page, int pageSize = 50, CancellationToken ct = default) =>
+        int page, int pageSize = 50, bool includeRemoved = false, CancellationToken ct = default) =>
         GetAsync<CollectionPageDto>("api/collection" + Query(("q", query), ("sf", scryfall), ("sort", sort),
-            ("provider", provider), ("page", I(page)), ("pageSize", I(pageSize))), ct);
+            ("provider", provider), ("removed", includeRemoved ? "true" : null), ("page", I(page)), ("pageSize", I(pageSize))), ct);
 
     public Task<AddCardsResultDto> AddCardsAsync(AddCardsDto request, CancellationToken ct = default) =>
         SendAsync<AddCardsResultDto>(HttpMethod.Post, "api/collection", request, authenticated: true, ct);

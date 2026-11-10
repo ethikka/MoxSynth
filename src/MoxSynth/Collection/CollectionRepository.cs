@@ -149,10 +149,11 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
             where.Add("cc.added_at <= @asOf AND (cc.removed_at IS NULL OR cc.removed_at > @asOf)");
             p.Add("asOf", SqliteTime.ToDb(asOf));
         }
-        else
+        else if (!query.IncludeRemoved)
         {
             where.Add("cc.removed_at IS NULL");
         }
+        var includeRemoved = query.AsOf is null && query.IncludeRemoved;
 
         if (!string.IsNullOrWhiteSpace(query.Name))
         {
@@ -207,9 +208,12 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
             _ when scryfall.OrderBy is not null => $"{scryfall.OrderBy}, MAX(cc.name) COLLATE NOCASE, cc.finish, cc.condition",
             _ => byName,
         };
+        // Removed groups: right after the owned group of the same card when sorted by name, else after all owned ones.
+        if (includeRemoved)
+            orderBy = orderBy == byName ? $"{byName}, is_removed" : $"is_removed, {orderBy}";
 
-        var whereSql = string.Join(" AND ", where);
-        const string groupBy = "GROUP BY cc.card_uuid, cc.finish, cc.condition, cc.language";
+        var whereSql = where.Count == 0 ? "1" : string.Join(" AND ", where); // empty with IncludeRemoved and no filters
+        const string groupBy = "GROUP BY cc.card_uuid, cc.finish, cc.condition, cc.language, cc.removed_at IS NOT NULL";
         p.Add("take", pageSize);
         p.Add("skip", (page - 1) * pageSize);
 
@@ -219,9 +223,12 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
         if (usePrices) await AttachAsync(conn, "pr", paths.PricesPath, ct);
         try
         {
-            var totals = await conn.QuerySingleAsync<(long Groups, long Copies)>(new CommandDefinition($"""
-                SELECT COUNT(*), COALESCE(SUM(qty), 0)
-                FROM (SELECT COUNT(*) AS qty FROM collection_cards cc WHERE {whereSql} {groupBy})
+            // Copies = owned copies only; removed groups are counted separately.
+            var totals = await conn.QuerySingleAsync<(long Groups, long Copies, long Removed)>(new CommandDefinition($"""
+                SELECT COUNT(*), COALESCE(SUM(CASE WHEN removed THEN 0 ELSE qty END), 0),
+                       COALESCE(SUM(CASE WHEN removed THEN qty ELSE 0 END), 0)
+                FROM (SELECT COUNT(*) AS qty, {(includeRemoved ? "cc.removed_at IS NOT NULL" : "0")} AS removed
+                      FROM collection_cards cc WHERE {whereSql} {groupBy})
                 """, p, cancellationToken: ct));
 
             // Estimated value of everything matching the filters (not just this page).
@@ -232,14 +239,16 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
                     SELECT SUM(px.price), MAX(px.currency), COALESCE(SUM(px.price IS NULL), 0)
                     FROM collection_cards cc
                     {priceJoin}
-                    WHERE {whereSql}
+                    WHERE {whereSql}{(includeRemoved ? " AND cc.removed_at IS NULL" : "")}
                     """, p, cancellationToken: ct));
             }
 
             var groups = await conn.QueryAsync<CollectionGroup>(new CommandDefinition($"""
                 SELECT cc.card_uuid, MAX(cc.name) AS name, MAX(cc.set_code) AS set_code, MAX(cc.number) AS number,
                        cc.finish, cc.condition, cc.language, COUNT(*) AS quantity,
-                       MIN(cc.added_at) AS first_added_at, MAX(cc.added_at) AS last_added_at
+                       MIN(cc.added_at) AS first_added_at, MAX(cc.added_at) AS last_added_at,
+                       cc.removed_at IS NOT NULL AS is_removed, MAX(cc.removed_at) AS last_removed_at,
+                       GROUP_CONCAT(DISTINCT cc.removal_reason) AS removal_reasons
                 FROM collection_cards cc
                 {join}
                 WHERE {whereSql}
@@ -255,6 +264,7 @@ public sealed class CollectionRepository(CurrentProfile currentProfile, ProfileS
                 TotalValue = value.Value,
                 Currency = value.Currency,
                 UnpricedCopies = value.Unpriced,
+                RemovedCopies = totals.Removed,
             };
         }
         finally

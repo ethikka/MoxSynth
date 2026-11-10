@@ -33,6 +33,14 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
     [ObservableProperty]
     private string _summary = "";
 
+    /// <summary>Also list removed copies (greyed out, as their own groups).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRemovedText))]
+    private bool _showRemoved;
+
+    /// <summary>Menu text of the toggle.</summary>
+    public string ShowRemovedText => ShowRemoved ? "Hide removed cards" : "Show removed cards";
+
     public ObservableCollection<GroupItem> Groups { get; } = [];
     public IReadOnlyList<VocabularyOption> Sorts => CardVocabulary.CollectionSorts;
 
@@ -42,6 +50,10 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
     partial void OnQueryChanged(string value) => Schedule(SearchViewModel.Debounce);
     partial void OnScryfallChanged(string value) => Schedule(SearchViewModel.Debounce);
     partial void OnSelectedSortChanged(VocabularyOption value) => Schedule(TimeSpan.Zero);
+    partial void OnShowRemovedChanged(bool value) => Schedule(TimeSpan.Zero);
+
+    [RelayCommand]
+    private void ToggleRemoved() => ShowRemoved = !ShowRemoved;
 
     /// <summary>Reloads when shown (cards may have been added elsewhere) – keeps the list while loading.</summary>
     public override Task OnAppearingAsync()
@@ -77,7 +89,7 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
 
         await RunAsync(async () =>
         {
-            var page = await api.GetCollectionAsync(Query, Scryfall, SelectedSort.Value, session.Provider, 1, PageSize, ct);
+            var page = await api.GetCollectionAsync(Query, Scryfall, SelectedSort.Value, session.Provider, 1, PageSize, ShowRemoved, ct);
             if (ct.IsCancellationRequested) return;
             Groups.Clear();
             foreach (var g in page.Groups.Items) Groups.Add(new GroupItem(g));
@@ -93,6 +105,7 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
     {
         var text = $"{page.TotalCopies:N0} cards in {page.Groups.TotalCount:N0} groups";
         if (page.TotalValue is { } value) text += " · " + CardVocabulary.FormatPrice(page.Currency, value);
+        if (page.RemovedCopies > 0) text += $" · {page.RemovedCopies:N0} removed";
         return text;
     }
 
@@ -103,7 +116,7 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
         var ct = _searchCts?.Token ?? default;
         await RunAsync(async () =>
         {
-            var page = await api.GetCollectionAsync(Query, Scryfall, SelectedSort.Value, session.Provider, _page + 1, PageSize, ct);
+            var page = await api.GetCollectionAsync(Query, Scryfall, SelectedSort.Value, session.Provider, _page + 1, PageSize, ShowRemoved, ct);
             if (ct.IsCancellationRequested) return;
             foreach (var g in page.Groups.Items) Groups.Add(new GroupItem(g));
             _page = page.Groups.Page;
@@ -139,5 +152,7 @@ public sealed partial class CollectionViewModel(MoxApiClient api, AppSession ses
             item.Quantity--;
             if (item.Quantity == 0) Groups.Remove(item);
         }, showBusy: false);
+        // The removed copy now shows up (or grows) in its removed group.
+        if (ShowRemoved) Schedule(TimeSpan.Zero, showBusy: false);
     }
 }
