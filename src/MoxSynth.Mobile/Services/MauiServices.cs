@@ -14,7 +14,7 @@ public sealed class PreferencesSettingsStore : ISettingsStore
     }
 }
 
-/// <summary>Session tokens in SecureStorage (encrypted with a key from the Android Keystore).</summary>
+/// <summary>Session tokens in SecureStorage (Android: encrypted with a Keystore key; iOS: the Keychain).</summary>
 public sealed class SecureTokenStore : ITokenStore
 {
     private const string Key = "moxsynth-session";
@@ -73,6 +73,8 @@ public sealed class ShellDialogs : IDialogs
 #if ANDROID
         Android.Widget.Toast.MakeText(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity ?? Android.App.Application.Context, message,
             Android.Widget.ToastLength.Short)?.Show();
+#elif IOS
+        IosToast.Show(message);
 #endif
     });
 }

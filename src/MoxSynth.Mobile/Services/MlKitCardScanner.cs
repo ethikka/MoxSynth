@@ -6,7 +6,7 @@ using Plugin.Maui.OCR;
 namespace MoxSynth.Mobile.Services;
 
 /// <summary>
-/// Reads cards on the device with Google ML Kit: live in the in-app camera view (<see cref="LiveScanPage"/>), or from a
+/// Reads cards on the device (Google ML Kit on Android, Apple Vision on iOS): live in the in-app camera view (<see cref="LiveScanPage"/>), or from a
 /// photo picked from the gallery or taken with the camera app (Plugin.Maui.OCR). Only the recognised text + positions
 /// go to the server, never the picture.
 /// </summary>
@@ -37,7 +37,7 @@ public sealed class MlKitCardScanner(IOcrService ocr, IServiceProvider services)
         if (!fromGallery && await Permissions.RequestAsync<Permissions.Camera>() != PermissionStatus.Granted)
             throw new InvalidOperationException("MoxSynth needs camera permission to scan cards.");
 
-        // Upright (EXIF rotation applied) and not larger than needed: ML Kit doesn't read the EXIF orientation,
+        // Upright (EXIF rotation applied) and not larger than needed: the recognisers don't read the EXIF orientation,
         // and a card title is easily readable at ~1600 px.
         var options = new MediaPickerOptions
         {
@@ -72,7 +72,7 @@ public sealed class MlKitCardScanner(IOcrService ocr, IServiceProvider services)
         var words = result.Elements
             .Select(e => new OcrLineDto(e.Text, e.X, e.Y, e.Width, e.Height))
             .ToList();
-        // No positions (shouldn't happen with ML Kit): fall back to the plain lines, top to bottom.
+        // No positions (shouldn't happen): fall back to the plain lines, top to bottom.
         if (words.Count == 0)
             return result.Lines.Select((text, i) => new OcrLineDto(text, 0, i * 20, 100, 18)).ToList();
 

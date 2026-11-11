@@ -102,7 +102,7 @@ Paths can be changed in `appsettings.json` under `Databases`.
 
 ## Running in Docker (home server / NAS)
 
-The web app and the API for the Android app run together in one container. Everything that changes – card
+The web app and the API for the mobile app run together in one container. Everything that changes – card
 catalogue, profiles, collections, prices and the sign-in keys – lives in `./data` next to `compose.yaml`
 (mounted at `/app/App_Data`), so the container itself can be rebuilt or replaced at any time.
 
@@ -113,15 +113,17 @@ catalogue, profiles, collections, prices and the sign-in keys – lives in `./da
 3. Make the folder writable for the container. Either run it as the folder's owner – create a `.env` file next to
    `compose.yaml` with `PUID=…` and `PGID=…` (from `id -u` / `id -g`; on Synology the uid/gid of your user) – or
    give it to the image's default user: `sudo chown -R 1654:1654 data`.
-4. Start it: `docker compose up -d --build`
-5. Open `http://<server>:5180`. Prices can be downloaded from the app (*profile menu → Update prices*), which needs
+4. Create the HTTPS certificate (see *HTTPS with a self-signed certificate* below): `scripts/make-cert.sh`
+5. Start it: `docker compose up -d --build`
+6. Open `https://moxsynth.anarki.local` (or `http://<server>:5180`). Prices can be downloaded from the app (*profile menu → Update prices*), which needs
    internet access from the container.
 
 `.env` settings (all optional):
 
 | Variable | Default | |
 |---|---|---|
-| `MOXSYNTH_PORT` | `5180` | port on the server (the Android app's default is `moxsynth:5180`) |
+| `MOXSYNTH_PORT` | `5180` | http port on the server (the mobile app's default is `moxsynth:5180`) |
+| `MOXSYNTH_HTTPS_PORT` | `443` | https port on the server |
 | `PUID` / `PGID` | `1654` | user / group the app runs as – must be able to write `./data` |
 | `TZ` | `Europe/Amsterdam` | time zone for dates shown in the app and in import notes |
 
@@ -132,16 +134,43 @@ Updating: `git pull && docker compose up -d --build`. Backups: stop the containe
 `./data` (`prices.db`, `AllPrintings.sqlite` and the zips can be downloaded again; `profiles.db`, `collections/`
 and `keys/` are the irreplaceable part).
 
-The image builds for x64 and ARM64 (Raspberry Pi, most NASes). It serves plain http – fine on the home network; put
-a reverse proxy with HTTPS in front if you ever expose it to the internet.
+The image builds for x64 and ARM64 (Raspberry Pi, most NASes).
 
-## Android app
+### HTTPS with a self-signed certificate
 
-`src/MoxSynth.Mobile` is a .NET MAUI app for Android that uses the same server (and therefore the same profiles,
+The container serves HTTPS itself (port 443, plus plain http on 5180) – no reverse proxy needed. HTTPS is required
+for the live camera in the web scanner on phones and tablets.
+
+1. Make sure `moxsynth.anarki.local` resolves to the server (DNS / DHCP host entry in the router, or `/etc/hosts`).
+2. On the server, next to `compose.yaml`: `scripts/make-cert.sh` (or `scripts/make-cert.sh other.host.name`).
+   It creates a small private CA and a server certificate in `./data/certs`. Run it as the user the container runs
+   as (`PUID`), or `chown` the files to it afterwards – the container must be able to read `moxsynth.key`.
+3. `docker compose up -d` and open `https://moxsynth.anarki.local`.
+4. Trust `data/certs/moxsynth-ca.crt` (not `moxsynth.crt`) on each device once:
+   - **macOS**: double-click it → Keychain Access → *System* → open it → *Trust → Always Trust*.
+   - **Windows**: `certutil -addstore Root moxsynth-ca.crt` (admin), or double-click → install into
+     *Trusted Root Certification Authorities*.
+   - **iOS / iPadOS**: AirDrop or mail it → *Settings → Profile Downloaded → Install*, then *Settings → General →
+     About → Certificate Trust Settings* → turn on *MoxSynth local CA*.
+   - **Android**: *Settings → Security → Encryption & credentials → Install a certificate → CA certificate*.
+   - **Firefox** uses its own store: *Settings → Privacy & Security → Certificates → View Certificates →
+     Authorities → Import*.
+
+The server certificate is valid for 825 days. Renew it by running `scripts/make-cert.sh` again and restarting the
+container – it reuses the CA, so devices don't need to be set up again. Keep `moxsynth-ca.key` private.
+
+Without `./data/certs/moxsynth.crt` the container won't start; to run without HTTPS, remove the three
+`ASPNETCORE_…` HTTPS lines and the 443 port from `compose.yaml`.
+
+## Mobile app (Android and iOS)
+
+`src/MoxSynth.Mobile` is a .NET MAUI app for Android and iOS that uses the same server (and therefore the same profiles,
 collections and prices) through a JSON API. It has a dashboard, card search (name words / collector number +
 Scryfall syntax, quick add), card pages with all prices and your copies, the collection (filter, sort by value,
-±1), history, and **card scanning with the phone camera**: the photo is read on the phone with Google ML Kit
-(only the recognised text is sent to the server, which finds the card with the same recogniser as the web scanner).
+±1), history, and **card scanning with the phone camera**: the photo is read on the phone – Google ML Kit on Android, Apple Vision on
+iOS – and only the recognised text is sent to the server, which finds the card with the same recogniser as the web
+scanner. Both platforms share all pages and view models; only the live camera (`Platforms/Android|iOS/LiveCardCamera.cs`)
+and a few small platform services differ.
 
 ### Running the server for the phone
 
@@ -157,7 +186,9 @@ The app connects to **`moxsynth:5180`** by default, so give the server computer 
 network (e.g. a DNS / DHCP host-name entry in the router). Otherwise enter its IP address instead (macOS:
 *System Settings → Wi-Fi → Details*, or `ipconfig getifaddr en0`), e.g. `192.168.1.20:5180`; the app remembers it.
 Allow incoming connections if the firewall asks, pick your profile and sign in with your MoxSynth password.
-Plain http is only meant for your home network.
+Plain http is only meant for your home network. On iOS, http is only allowed to local addresses (IP addresses,
+names without a dot like `moxsynth`, `*.local`), and iOS asks once for permission to access the local network –
+allow it, or the app can't reach the server (*Settings → Privacy & Security → Local Network* if you said no).
 
 ### Themes
 
@@ -167,7 +198,7 @@ heading fonts (Orbitron, Creepster, Cinzel, Rajdhani; bundled under `Resources/F
 Palettes live in `MoxSynth.Client/Services/ThemeCatalog.cs`; `ThemeService` turns them into `Theme*` resources that
 all styles use as `DynamicResource`, so switching is instant. The choice is stored per phone.
 
-### Building the app
+### Building the Android app
 
 1. Install the MAUI Android workload: `dotnet workload install maui-android`
 2. Install the Android SDK + Java (Rider / Android Studio do this, or
@@ -180,8 +211,37 @@ all styles use as `DynamicResource`, so switching is instant. The choice is stor
 
    An installable APK: `dotnet publish src/MoxSynth.Mobile -f net10.0-android -c Release` (in `bin/Release/.../publish`).
 
+### Building the iOS app
+
+Needs a Mac. The iOS target is only added to the project on macOS, so the Android app still builds on Windows / Linux.
+
+1. Install Xcode from the App Store, open it once (accept the licence, install the iOS platform), and point the
+   command-line tools at it: `sudo xcode-select -s /Applications/Xcode.app`
+2. Install the MAUI iOS workload: `sudo dotnet workload install maui-ios`. If the build says *"This version of .NET
+   for iOS requires Xcode …"*, update the workloads (`sudo dotnet workload update`) or, as a stopgap, add
+   `-p:ValidateXcodeVersion=false` to the commands below (works with Xcode 27.2 and .NET for iOS 26.5).
+3. In the iOS Simulator (no camera there, so no live scanning; picking a photo from the library works):
+
+   ```bash
+   dotnet build src/MoxSynth.Mobile -t:Run -f net10.0-ios
+   ```
+
+4. On an iPhone: in Xcode, *Settings → Accounts*, sign in with your Apple ID. A free Apple ID can sign the app for
+   your own devices (it has to be re-installed every 7 days); a paid Apple Developer Program membership removes
+   that limit and allows TestFlight. Put the phone in developer mode (*Settings → Privacy & Security → Developer
+   Mode*), connect it with a cable and run:
+
+   ```bash
+   dotnet build src/MoxSynth.Mobile -t:Run -f net10.0-ios -p:RuntimeIdentifier=ios-arm64
+   ```
+
+   With a free Apple ID the bundle identifier `com.ethikka.moxsynth` may already be taken; change `ApplicationId`
+   in `MoxSynth.Mobile.csproj` (or pass `-p:ApplicationId=…`) to something of your own. The first time, trust the
+   developer on the phone under *Settings → General → VPN & Device Management*.
+
 Signing in returns an access token (1 hour) and a refresh token (30 days) – both encrypted with the server's
-Data Protection keys, stored on the phone in Android's secure storage, and invalidated when the password changes.
+Data Protection keys, stored on the phone in secure storage (Android Keystore / iOS Keychain), and invalidated when the password changes.
+
 
 ### API
 
@@ -218,7 +278,7 @@ three needs `Authorization: Bearer <accessToken>`.
 
 ```
 src/MoxSynth/             web app + API (server)
-  Api/              JSON API for the Android app (/api)
+  Api/              JSON API for the mobile app (/api)
   Cards/            read-only catalogue access (AllPrintings), Scryfall syntax, card recogniser
   Collection/       collection schema, models and repository
   Prices/           price import (AllPrices.json.zip) and repository
@@ -227,7 +287,7 @@ src/MoxSynth/             web app + API (server)
   Components/       Blazor layout, pages and shared components
 src/MoxSynth.Contracts/   API request/response types (shared by server and app)
 src/MoxSynth.Client/      app logic without UI: API client (token refresh), view models
-src/MoxSynth.Mobile/      .NET MAUI Android app: pages, camera + ML Kit OCR, secure storage
+src/MoxSynth.Mobile/      .NET MAUI Android + iOS app: pages, camera + OCR (ML Kit / Vision), secure storage
 ```
 
 Building the whole solution needs the MAUI workload; without it build the web app alone
