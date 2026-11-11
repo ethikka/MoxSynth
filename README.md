@@ -113,15 +113,17 @@ catalogue, profiles, collections, prices and the sign-in keys – lives in `./da
 3. Make the folder writable for the container. Either run it as the folder's owner – create a `.env` file next to
    `compose.yaml` with `PUID=…` and `PGID=…` (from `id -u` / `id -g`; on Synology the uid/gid of your user) – or
    give it to the image's default user: `sudo chown -R 1654:1654 data`.
-4. Start it: `docker compose up -d --build`
-5. Open `http://<server>:5180`. Prices can be downloaded from the app (*profile menu → Update prices*), which needs
+4. Create the HTTPS certificate (see *HTTPS with a self-signed certificate* below): `scripts/make-cert.sh`
+5. Start it: `docker compose up -d --build`
+6. Open `https://moxsynth.anarki.local` (or `http://<server>:5180`). Prices can be downloaded from the app (*profile menu → Update prices*), which needs
    internet access from the container.
 
 `.env` settings (all optional):
 
 | Variable | Default | |
 |---|---|---|
-| `MOXSYNTH_PORT` | `5180` | port on the server (the mobile app's default is `moxsynth:5180`) |
+| `MOXSYNTH_PORT` | `5180` | http port on the server (the mobile app's default is `moxsynth:5180`) |
+| `MOXSYNTH_HTTPS_PORT` | `443` | https port on the server |
 | `PUID` / `PGID` | `1654` | user / group the app runs as – must be able to write `./data` |
 | `TZ` | `Europe/Amsterdam` | time zone for dates shown in the app and in import notes |
 
@@ -132,8 +134,33 @@ Updating: `git pull && docker compose up -d --build`. Backups: stop the containe
 `./data` (`prices.db`, `AllPrintings.sqlite` and the zips can be downloaded again; `profiles.db`, `collections/`
 and `keys/` are the irreplaceable part).
 
-The image builds for x64 and ARM64 (Raspberry Pi, most NASes). It serves plain http – fine on the home network; put
-a reverse proxy with HTTPS in front if you ever expose it to the internet.
+The image builds for x64 and ARM64 (Raspberry Pi, most NASes).
+
+### HTTPS with a self-signed certificate
+
+The container serves HTTPS itself (port 443, plus plain http on 5180) – no reverse proxy needed. HTTPS is required
+for the live camera in the web scanner on phones and tablets.
+
+1. Make sure `moxsynth.anarki.local` resolves to the server (DNS / DHCP host entry in the router, or `/etc/hosts`).
+2. On the server, next to `compose.yaml`: `scripts/make-cert.sh` (or `scripts/make-cert.sh other.host.name`).
+   It creates a small private CA and a server certificate in `./data/certs`. Run it as the user the container runs
+   as (`PUID`), or `chown` the files to it afterwards – the container must be able to read `moxsynth.key`.
+3. `docker compose up -d` and open `https://moxsynth.anarki.local`.
+4. Trust `data/certs/moxsynth-ca.crt` (not `moxsynth.crt`) on each device once:
+   - **macOS**: double-click it → Keychain Access → *System* → open it → *Trust → Always Trust*.
+   - **Windows**: `certutil -addstore Root moxsynth-ca.crt` (admin), or double-click → install into
+     *Trusted Root Certification Authorities*.
+   - **iOS / iPadOS**: AirDrop or mail it → *Settings → Profile Downloaded → Install*, then *Settings → General →
+     About → Certificate Trust Settings* → turn on *MoxSynth local CA*.
+   - **Android**: *Settings → Security → Encryption & credentials → Install a certificate → CA certificate*.
+   - **Firefox** uses its own store: *Settings → Privacy & Security → Certificates → View Certificates →
+     Authorities → Import*.
+
+The server certificate is valid for 825 days. Renew it by running `scripts/make-cert.sh` again and restarting the
+container – it reuses the CA, so devices don't need to be set up again. Keep `moxsynth-ca.key` private.
+
+Without `./data/certs/moxsynth.crt` the container won't start; to run without HTTPS, remove the three
+`ASPNETCORE_…` HTTPS lines and the 443 port from `compose.yaml`.
 
 ## Mobile app (Android and iOS)
 

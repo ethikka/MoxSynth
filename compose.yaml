@@ -2,8 +2,9 @@
 #
 #   1. Put AllPrintings.sqlite.zip (mtgjson.com → All Files) in ./data – copy the rest of an existing
 #      src/MoxSynth/App_Data along with it to keep profiles, collections, prices and sign-ins.
-#   2. docker compose up -d --build
-#   3. Open http://<server>:5180  (Android app: server address <server>:5180, default moxsynth:5180)
+#   2. scripts/make-cert.sh  – self-signed HTTPS certificate for moxsynth.anarki.local in ./data/certs
+#   3. docker compose up -d --build
+#   4. Open https://moxsynth.anarki.local  (or http://<server>:5180; mobile app default moxsynth:5180)
 #
 # Settings can be overridden in a .env file next to this one (see README → "Running in Docker").
 services:
@@ -14,10 +15,15 @@ services:
     restart: unless-stopped
     ports:
       - "${MOXSYNTH_PORT:-5180}:8080"
+      - "${MOXSYNTH_HTTPS_PORT:-443}:8443"
     # Runs as this user id so it can write ./data (use the owner of ./data: `id -u` / `id -g`).
     user: "${PUID:-1654}:${PGID:-1654}"
     environment:
       TZ: ${TZ:-Europe/Amsterdam}   # dates in notes and lists are shown in this time zone
+      # HTTPS straight from the app with the certificate from scripts/make-cert.sh (PEM files in ./data/certs).
+      ASPNETCORE_HTTPS_PORTS: 8443
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /app/App_Data/certs/moxsynth.crt
+      ASPNETCORE_Kestrel__Certificates__Default__KeyPath: /app/App_Data/certs/moxsynth.key
       # Optional overrides of appsettings.json, e.g. which shops' prices to import:
       # Prices__Providers__0: cardmarket
       # Prices__Providers__1: tcgplayer
