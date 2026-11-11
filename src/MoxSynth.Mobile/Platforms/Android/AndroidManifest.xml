@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 	<!--
-	  usesCleartextTraffic: the MoxSynth server runs on your own computer in the home network over plain http.
+	  networkSecurityConfig: the MoxSynth server runs on your own computer in the home network – plain http, or https with
+	  a CA you installed yourself (moxsynth-ca.crt from scripts/make-cert.sh). See Resources/xml/network_security_config.xml.
 	  allowBackup=false: the session is encrypted with a device-bound Keystore key, a restored backup can't be read.
 	-->
 	<application android:allowBackup="false" android:icon="@mipmap/appicon" android:roundIcon="@mipmap/appicon_round"
-	             android:supportsRtl="true" android:usesCleartextTraffic="true" android:label="MoxSynth"></application>
+	             android:supportsRtl="true" android:networkSecurityConfig="@xml/network_security_config" android:label="MoxSynth"></application>
 
 	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 	<uses-permission android:name="android.permission.INTERNET" />

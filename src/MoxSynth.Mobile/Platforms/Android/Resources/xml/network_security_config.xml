@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The MoxSynth server runs on your own home network:
+  - plain http stays allowed (the default http://moxsynth:5180), as android:usesCleartextTraffic did before
+    (that attribute is ignored once a network security config is set);
+  - https also trusts CA certificates you installed yourself (Settings → Security → Install a certificate), so the
+    self-signed moxsynth-ca.crt from scripts/make-cert.sh works for https://moxsynth.anarki.local. Android apps
+    ignore user-installed CAs unless they opt in like this.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
